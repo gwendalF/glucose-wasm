@@ -1,0 +1,6 @@
+{
+	"biome.configurationPath": ".config/biome.json",
+	"editor.codeActionsOnSave": {
+		"source.fixAll.biome": "explicit"
+	}
+}

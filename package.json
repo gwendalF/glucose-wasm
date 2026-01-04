@@ -1,0 +1,37 @@
+{
+	"name": "glucose-wasm",
+	"version": "0.0.0",
+	"description": "Reporter for diabete",
+	"type": "module",
+	"scripts": {
+		"start": "vite",
+		"dev": "vite",
+		"build": "vite build",
+		"serve": "vite preview",
+		"test": "vitest",
+		"check": "biome check --write"
+	},
+	"license": "MIT",
+	"devDependencies": {
+		"@biomejs/biome": "2.3.11",
+		"@solidjs/testing-library": "^0.8.10",
+		"@testing-library/jest-dom": "^6.6.3",
+		"@unocss/reset": "^66.5.12",
+		"@vitest/browser-playwright": "^4.0.16",
+		"@vitest/browser-webdriverio": "^4.0.16",
+		"happy-dom": "^20.0.11",
+		"jsdom": "^25.0.1",
+		"solid-devtools": "^0.34.3",
+		"typescript": "^5.7.2",
+		"unocss": "^66.5.12",
+		"vite": "^7.1.4",
+		"vite-plugin-solid": "2.11.9",
+		"vitest": "^4.0.0"
+	},
+	"dependencies": {
+		"@sqlite.org/sqlite-wasm": "3.51.1-build2",
+		"solid-js": "^1.9.5",
+		"sqlocal": "^0.16.0",
+		"uplot": "^1.6.32"
+	}
+}
