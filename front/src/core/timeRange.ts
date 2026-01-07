@@ -1,6 +1,6 @@
 export type TimeRange = {
-	start: Timestamp;
-	end: Timestamp;
+	from: Timestamp;
+	to: Timestamp;
 };
 
 export type Timestamp = number & { __brand: "Timestamp" };
@@ -23,7 +23,7 @@ export const HOURS = 1000 * 60 * 60;
 
 export type TimePreset = (typeof TimePresets)[keyof typeof TimePresets];
 
-export const timeRangeFor = (preset: TimePreset, now: Timestamp): TimeRange => {
+export const presetMs = (preset: TimePreset): number => {
 	let durationMs: number;
 	switch (preset) {
 		case "Last6Hours":
@@ -37,9 +37,14 @@ export const timeRangeFor = (preset: TimePreset, now: Timestamp): TimeRange => {
 			break;
 	}
 
-	const start = now - timestamp(durationMs);
+	return durationMs;
+};
+
+export const timeRangeFor = (preset: TimePreset, end: Timestamp): TimeRange => {
+	const durationMs = presetMs(preset);
+	const from = timestamp(end - durationMs);
 	return {
-		start: start as Timestamp,
-		end: now,
+		from,
+		to: end,
 	};
 };

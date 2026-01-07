@@ -5,13 +5,17 @@ dist
 .netlify
 .vinxi
 app.config.timestamp_*.js
+target/
 
 # Environment
 .env
 .env*.local
 
 # dependencies
-/node_modules
+node_modules
+
+#db
+back/db
 
 # IDEs and editors
 /.idea

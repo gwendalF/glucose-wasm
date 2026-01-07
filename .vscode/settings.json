@@ -1,6 +1,13 @@
 {
-	"biome.configurationPath": ".config/biome.json",
+	"editor.formatOnSave": true,
+	"editor.defaultFormatter": "biomejs.biome",
 	"editor.codeActionsOnSave": {
-		"source.fixAll.biome": "explicit"
-	}
+		"source.fixAll.biome": "explicit",
+		"source.organizeImports.biome": "explicit"
+	},
+	"[jsonc]": {
+		"editor.defaultFormatter": "biomejs.biome"
+	},
+	"biome.configurationPath": "./front/biome.json",
+	"biome.lsp.bin": "./front/node_modules/.bin/biome.ps1"
 }

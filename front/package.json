@@ -8,12 +8,14 @@
 		"dev": "vite",
 		"build": "vite build",
 		"serve": "vite preview",
-		"test": "vitest",
+		"test": "vitest --project unit --project ui",
+		"test:all": "vitest",
 		"check": "biome check --write"
 	},
 	"license": "MIT",
 	"devDependencies": {
 		"@biomejs/biome": "2.3.11",
+		"@iconify/json": "^2.2.424",
 		"@solidjs/testing-library": "^0.8.10",
 		"@testing-library/jest-dom": "^6.6.3",
 		"@unocss/reset": "^66.5.12",
@@ -30,8 +32,9 @@
 	},
 	"dependencies": {
 		"@sqlite.org/sqlite-wasm": "3.51.1-build2",
+		"echarts": "^6.0.0",
 		"solid-js": "^1.9.5",
 		"sqlocal": "^0.16.0",
-		"uplot": "^1.6.32"
+		"unplugin-icons": "^22.5.0"
 	}
 }

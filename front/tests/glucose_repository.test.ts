@@ -1,7 +1,7 @@
 import { SQLocal } from "sqlocal";
 import { describe, test } from "vitest";
-import { fromDate, timestamp } from "../timeRange";
-import { SQLRepository } from "./glucose_repository";
+import { fromDate, timestamp } from "../src/core/timeRange";
+import { SQLRepository } from "../src/repository/glucose_repository";
 
 describe("SQLite glucose repository", () => {
 	const setupRepo = async () => {
@@ -20,9 +20,9 @@ describe("SQLite glucose repository", () => {
 
 	test("no values by default", async ({ expect }) => {
 		const { repo } = await setupRepo();
-		const values = await repo.getGlucoseValues({
-			start: timestamp(0),
-			end: timestamp(Date.now()),
+		const values = await repo.fetch({
+			from: timestamp(0),
+			to: timestamp(Date.now()),
 		});
 		expect(values).toHaveLength(0);
 	});
@@ -35,9 +35,9 @@ describe("SQLite glucose repository", () => {
             VALUES  ('abcde',80, ${start - 10}), 
                     ('efgh', 95, ${start + 50})`;
 
-		const values = await repo.getGlucoseValues({
-			start,
-			end: timestamp(Date.now()),
+		const values = await repo.fetch({
+			from: start,
+			to: timestamp(Date.now()),
 		});
 		expect(values).toEqual([{ timestamp: start + 50, glucose: 95 }]);
 	});
@@ -53,7 +53,7 @@ describe("SQLite glucose repository", () => {
       ('c',95,${end}),
       ('d',95,${end + 1})`;
 
-		const values = await repo.getGlucoseValues({ start, end });
+		const values = await repo.fetch({ from: start, to: end });
 		expect(values).toEqual([
 			{ timestamp: start, glucose: 80 },
 			{ timestamp: end, glucose: 95 },
@@ -69,9 +69,9 @@ describe("SQLite glucose repository", () => {
       ('c', 95, 4556466),
       ('d', 120, 12300002544)`;
 
-		const values = await repo.getGlucoseValues({
-			start: timestamp(0),
-			end: timestamp(12300002544),
+		const values = await repo.fetch({
+			from: timestamp(0),
+			to: timestamp(12300002544),
 		});
 
 		expect(values).toEqual([
