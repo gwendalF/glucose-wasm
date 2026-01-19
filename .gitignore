@@ -23,6 +23,9 @@ androidaps.db
 *.stryker-tmp
 front/reports
 
+#tests
+*.stryker-tmp
+
 # IDEs and editors
 /.idea
 .project
