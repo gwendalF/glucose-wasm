@@ -1,6 +1,6 @@
 import { describe, test } from "vitest";
-import { prepareData } from "./core/graph";
-import { timestamp } from "./core/timeRange";
+import { timestamp } from "../domain/TimeRange";
+import { prepareData } from "./prepareData";
 
 describe("graph", () => {
 	test("empty data return empty array", ({ expect }) => {

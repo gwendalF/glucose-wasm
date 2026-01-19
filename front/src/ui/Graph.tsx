@@ -10,9 +10,9 @@ import { type ECharts, init, use } from "echarts/core";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer } from "echarts/renderers";
 import { createEffect, createSignal, onCleanup } from "solid-js";
-import type { GlucoseValue } from "./core/dashboard";
-import { prepareData } from "./core/graph";
-import type { TimePreset } from "./core/timeRange";
+import type { GlucoseValue } from "../application/Dashboard";
+import type { TimePreset } from "../domain/TimeRange";
+import { prepareData } from "./prepareData";
 import { useDimension } from "./useDimension";
 
 use([

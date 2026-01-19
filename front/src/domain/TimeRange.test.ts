@@ -1,6 +1,6 @@
 import { describe, test } from "vitest";
 
-import { fromDate, TimePresets, timeRangeFor } from "./timeRange";
+import { fromDate, TimePresets, timeRangeFor } from "./TimeRange";
 
 describe("timeRangeFor", () => {
 	const now = fromDate(new Date("2026-01-02T12:00:00.000Z"));

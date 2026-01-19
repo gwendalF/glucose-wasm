@@ -4,7 +4,7 @@ import {
 	type TimeRange,
 	type Timestamp,
 	timeRangeFor,
-} from "./timeRange";
+} from "@domain/TimeRange";
 
 export type GlucoseValue = {
 	timestamp: Timestamp;
@@ -21,6 +21,7 @@ export type DashboardState = {
 	status: DashboardStatus;
 	values: GlucoseValue[];
 	currentEnd?: Timestamp;
+	range?: TimeRange;
 };
 export interface GlucoseRepository {
 	fetch(range: TimeRange): Promise<GlucoseValue[]>;
@@ -75,6 +76,7 @@ export class Dashboard {
 			status: this.status,
 			values: this.values,
 			currentEnd: this.currentEnd,
+			range: this.range(),
 		};
 	};
 
@@ -96,6 +98,13 @@ export class Dashboard {
 
 	getEnd = () => {
 		return this.currentEnd;
+	};
+
+	private range = () => {
+		const end = this.getEnd();
+		if (!end) return;
+
+		return timeRangeFor(this.preset, end);
 	};
 
 	private setState(s: Partial<DashboardState>) {

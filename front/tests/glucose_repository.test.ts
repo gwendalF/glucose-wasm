@@ -1,7 +1,7 @@
 import { SQLocal } from "sqlocal";
 import { describe, test } from "vitest";
-import { fromDate, timestamp } from "../src/core/timeRange";
-import { SQLRepository } from "../src/repository/glucose_repository";
+import { fromDate, timestamp } from "../src/domain/TimeRange";
+import { SQLRepository } from "../src/infrastructure/GlucoseRepository";
 
 describe("SQLite glucose repository", () => {
 	const setupRepo = async () => {

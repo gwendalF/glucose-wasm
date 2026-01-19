@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 /// <reference types="vite/client" />
 
+import path from "node:path";
 import { playwright } from "@vitest/browser-playwright";
 import devtools from "solid-devtools/vite";
 import sqlocal from "sqlocal/vite";
@@ -18,6 +19,14 @@ export default defineConfig({
 		sqlocal(),
 		Icons({ compiler: "solid" }),
 	],
+	resolve: {
+		alias: {
+			"@domain": path.resolve("src/domain"),
+			"@application": path.resolve("src/application"),
+			"@ui": path.resolve("src/ui"),
+			"@infra": path.resolve("src/infrastructure"),
+		},
+	},
 	test: {
 		projects: [
 			{

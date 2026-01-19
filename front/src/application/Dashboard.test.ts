@@ -1,11 +1,17 @@
+import {
+	fromDate,
+	HOURS,
+	TimePresets,
+	type TimeRange,
+	timestamp,
+} from "@domain/TimeRange";
 import { describe, test } from "vitest";
 import {
 	Dashboard,
 	type DashboardState,
 	type GlucoseValue,
 	type Stream,
-} from "./dashboard";
-import { fromDate, TimePresets, type TimeRange, timestamp } from "./timeRange";
+} from "./Dashboard";
 
 describe("Dashboard", () => {
 	type Params = {
@@ -238,6 +244,10 @@ describe("Dashboard", () => {
 		expect(snapshots[snapshots.length - 1]).toMatchObject({
 			status: "ready",
 			values,
+			range: {
+				from: timestamp(12223344 - 24 * HOURS),
+				to: timestamp(12223344),
+			},
 		});
 	});
 

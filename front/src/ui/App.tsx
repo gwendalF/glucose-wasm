@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 import Left from "~icons/ant-design/arrow-left-outlined";
 import Right from "~icons/ant-design/arrow-right-outlined";
-import type { Dashboard } from "./core/dashboard";
+import type { Dashboard } from "../application/Dashboard";
 import {
 	HOURS,
 	presetMs,
@@ -9,8 +9,8 @@ import {
 	TimePresets,
 	timeRangeFor,
 	timestamp,
-} from "./core/timeRange";
-import { useDashboard, useDashboardState } from "./dashboard_context";
+} from "../domain/TimeRange";
+import { useDashboard, useDashboardState } from "./DashboardContext";
 import { Graph } from "./Graph";
 
 export const App = () => {
@@ -19,8 +19,8 @@ export const App = () => {
 	const state = useDashboardState(dashboard, () => {
 		const now = Date.now();
 		return {
-			start: timestamp(now - 24 * HOURS),
-			end: timestamp(now),
+			from: timestamp(now - 24 * HOURS),
+			to: timestamp(now),
 		};
 	});
 

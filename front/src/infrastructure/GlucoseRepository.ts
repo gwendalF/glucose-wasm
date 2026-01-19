@@ -1,16 +1,27 @@
-import { SQLocal } from "sqlocal";
 import type {
 	GlucoseRepository,
 	GlucoseValue,
 	Stream,
-} from "../core/dashboard";
-import { type TimeRange, timestamp } from "../core/timeRange";
+} from "@application/Dashboard";
+import type { GlucoseSyncRepo } from "@domain/SyncRange";
+import { type TimeRange, timestamp } from "@domain/TimeRange";
+import { SQLocal } from "sqlocal";
 
-export class SQLRepository implements GlucoseRepository {
+export class SQLRepository implements GlucoseRepository, GlucoseSyncRepo {
 	private db: SQLocal;
 
 	constructor(db: SQLocal) {
 		this.db = db;
+	}
+
+	insertItems = async (items: readonly GlucoseValue[]) => {
+		await this.db.sql`INSERT INTO glucose_values `;
+	};
+	markRangeComplete(range: TimeRange): Promise<void> {
+		throw new Error("Method not implemented.");
+	}
+	getMissingRanges(requested: TimeRange): Promise<TimeRange[]> {
+		throw new Error("Method not implemented.");
 	}
 
 	// biome-ignore lint/suspicious/noExplicitAny: any type from SQL
@@ -82,15 +93,15 @@ export class SQLite {
 	}
 }
 
-export class InMemoryRepository implements GlucoseRepository {
+export class InMemoryRepository implements GlucoseRepository, GlucoseSyncRepo {
 	private withRandom: boolean;
 	private data: GlucoseValue[];
 
 	constructor({
-		withRandom,
+		withRandom = false,
 		data,
-	}: { withRandom: boolean; data?: GlucoseValue[] }) {
-		this.withRandom = withRandom;
+	}: { withRandom?: boolean; data?: GlucoseValue[] }) {
+		this.withRandom = !!withRandom;
 		this.data = data ? data : [];
 	}
 
@@ -148,5 +159,15 @@ export class InMemoryRepository implements GlucoseRepository {
 				return () => {};
 			},
 		};
+	}
+
+	async insertItems(items: readonly GlucoseValue[]) {
+		this.data.push(...items);
+	}
+
+	async markRangeComplete(_range: TimeRange): Promise<void> {}
+
+	async getMissingRanges(requested: TimeRange): Promise<TimeRange[]> {
+		return [requested];
 	}
 }

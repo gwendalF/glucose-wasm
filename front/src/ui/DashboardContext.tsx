@@ -5,9 +5,8 @@ import {
 	onCleanup,
 	useContext,
 } from "solid-js";
-import type { Unsubscribe } from "unocss";
-import type { Dashboard, DashboardState } from "./dashboard";
-import type { TimeRange } from "./timeRange";
+import type { Dashboard, DashboardState } from "../application/Dashboard";
+import type { TimeRange } from "../domain/TimeRange";
 
 export const DashboardContext = createContext<Dashboard>();
 

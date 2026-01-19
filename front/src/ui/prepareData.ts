@@ -1,3 +1,4 @@
+import type { GlucoseValue } from "@application/Dashboard";
 import type { LineSeriesOption } from "echarts/charts";
 import type {
 	DatasetComponentOption,
@@ -6,7 +7,6 @@ import type {
 	TooltipComponentOption,
 } from "echarts/components";
 import type { ComposeOption } from "echarts/core";
-import type { GlucoseValue } from "./dashboard";
 
 type ECOption = ComposeOption<
 	| LineSeriesOption

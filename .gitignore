@@ -17,6 +17,9 @@ node_modules
 #db
 back/db
 
+#tests
+*.stryker-tmp
+
 # IDEs and editors
 /.idea
 .project

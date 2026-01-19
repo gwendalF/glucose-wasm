@@ -1,67 +1,7 @@
 import { describe, test, vi } from "vitest";
-import type { GlucoseValue } from "./dashboard";
-import { fromDate, type TimeRange, timestamp } from "./timeRange";
-
-type SyncBatch = { items: GlucoseValue[] } & (
-	| {
-			coveredRange: TimeRange;
-			status: "complete";
-	  }
-	| {
-			status: "pending";
-	  }
-);
-
-interface SyncSource {
-	fetchBatch(range: TimeRange): Promise<SyncBatch>;
-}
-
-interface GlucoseSyncRepo {
-	insertItems(items: readonly GlucoseValue[]): Promise<void>;
-	markRangeComplete(range: TimeRange): Promise<void>;
-	getMissingRanges(requested: TimeRange): Promise<TimeRange[]>;
-}
-
-class SyncRange {
-	constructor(
-		private readonly repo: GlucoseSyncRepo,
-		private readonly source: SyncSource,
-	) {}
-
-	run = async (range: TimeRange) => {
-		const ranges = await this.repo.getMissingRanges(range);
-		for (const range of ranges) {
-			await this.runOneRange(range);
-		}
-	};
-
-	private runOneRange = async (range: TimeRange) => {
-		let from = range.from;
-		while (from < range.to) {
-			const batch = await this.fetchAndInsert({ from: from, to: range.to });
-			if (batch.status === "complete") {
-				const coveredRange = {
-					from: from,
-					to: batch.coveredRange.to,
-				};
-
-				await this.repo.markRangeComplete(coveredRange);
-				from = batch.coveredRange.to;
-			} else {
-				break;
-			}
-		}
-	};
-
-	private fetchAndInsert = async (range: TimeRange) => {
-		const batch = await this.source.fetchBatch(range);
-		if (batch.items.length > 0) {
-			await this.repo.insertItems(batch.items);
-		}
-
-		return batch;
-	};
-}
+import { type GlucoseSyncRepo, SyncRange } from "./SyncRange";
+import type { SyncSource } from "./SyncSource";
+import { fromDate, timestamp } from "./TimeRange";
 
 describe("SyncRange check repo calls", ({ beforeEach }) => {
 	let repo: GlucoseSyncRepo;
@@ -209,50 +149,61 @@ describe("SyncRange check repo calls", ({ beforeEach }) => {
 		expect(source.fetchBatch).not.toHaveBeenCalled();
 	});
 
-	test("fetch only missing ranges", async ({ expect }) => {
-		const source = {
-			fetchBatch: vi
-				.fn<SyncSource["fetchBatch"]>()
-				.mockResolvedValueOnce({
-					items: [
-						{ timestamp: timestamp(100), glucose: 80 },
-						{ timestamp: timestamp(200), glucose: 90 },
-					],
-					coveredRange: { from: timestamp(100), to: timestamp(200) },
-					status: "complete",
-				})
-				.mockResolvedValueOnce({
-					items: [],
-					status: "pending",
-				})
-				.mockResolvedValueOnce({
-					items: [{ timestamp: timestamp(100), glucose: 80 }],
-					coveredRange: {
-						from: timestamp(0),
-						to: timestamp(400),
-					},
-					status: "complete",
-				})
-				.mockResolvedValueOnce({
-					items: [{ timestamp: timestamp(600), glucose: 120 }],
-					coveredRange: { from: timestamp(600), to: timestamp(1000) },
-					status: "complete",
-				}),
-		};
+	describe("fetch only missing range", () => {
+		test("when calling from 0 to 1000 and getting missing range [0..400] and [500..800], call fetchBatch with [0..400] and [500..800]", async ({
+			expect,
+		}) => {
+			const source = {
+				fetchBatch: vi
+					.fn<SyncSource["fetchBatch"]>()
+					.mockResolvedValueOnce({
+						items: [{ timestamp: timestamp(100), glucose: 80 }],
+						coveredRange: {
+							from: timestamp(0),
+							to: timestamp(400),
+						},
+						status: "complete",
+					})
+					.mockResolvedValueOnce({
+						items: [{ timestamp: timestamp(600), glucose: 120 }],
+						coveredRange: { from: timestamp(600), to: timestamp(1000) },
+						status: "complete",
+					}),
+			};
 
-		let sync = new SyncRange(repo, source);
-		await sync.run({ from: timestamp(0), to: timestamp(1000) });
+			repo.getMissingRanges = async () => {
+				return [
+					{ from: timestamp(0), to: timestamp(400) },
+					{ from: timestamp(500), to: timestamp(800) },
+				];
+			};
+			const sync = new SyncRange(repo, source);
 
-		source.fetchBatch.mockClear();
-		repo.getMissingRanges = async () => {
-			return [
-				{ from: timestamp(0), to: timestamp(400) },
-				{ from: timestamp(500), to: timestamp(800) },
-			];
-		};
-		sync = new SyncRange(repo, source);
+			await sync.run({ from: timestamp(0), to: timestamp(1000) });
+			expect(source.fetchBatch).toHaveBeenCalledTimes(2);
+			expect(source.fetchBatch).toHaveBeenCalledWith({
+				from: timestamp(0),
+				to: timestamp(400),
+			});
+			expect(source.fetchBatch).toHaveBeenCalledWith({
+				from: timestamp(500),
+				to: timestamp(800),
+			});
+		});
 
-		await sync.run({ from: timestamp(0), to: timestamp(1000) });
-		expect(source.fetchBatch).toHaveBeenCalledTimes(2);
+		test("when calling [0..1000] and has no missing ranges, do not call fetchBatch", async ({
+			expect,
+		}) => {
+			const source = {
+				fetchBatch: vi.fn<SyncSource["fetchBatch"]>(),
+			};
+
+			repo.getMissingRanges = async () => {
+				return [];
+			};
+			const sync = new SyncRange(repo, source);
+			await sync.run({ from: timestamp(0), to: timestamp(1000) });
+			expect(source.fetchBatch).not.toHaveBeenCalled();
+		});
 	});
 });

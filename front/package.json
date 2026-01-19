@@ -10,13 +10,16 @@
 		"serve": "vite preview",
 		"test": "vitest --project unit --project ui",
 		"test:all": "vitest",
-		"check": "biome check --write"
+		"check": "biome check --write",
+		"type-check": "tsc --noEmit"
 	},
 	"license": "MIT",
 	"devDependencies": {
 		"@biomejs/biome": "2.3.11",
 		"@iconify/json": "^2.2.424",
 		"@solidjs/testing-library": "^0.8.10",
+		"@stryker-mutator/core": "^9.4.0",
+		"@stryker-mutator/vitest-runner": "^9.4.0",
 		"@testing-library/jest-dom": "^6.6.3",
 		"@unocss/reset": "^66.5.12",
 		"@vitest/browser-playwright": "^4.0.16",
