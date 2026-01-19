@@ -16,7 +16,7 @@
 	"testRunner": "vitest",
 	"testRunner_comment": "Take a look at https://stryker-mutator.io/docs/stryker-js/vitest-runner for information about the vitest plugin.",
 	"coverageAnalysis": "off",
-	"cleanTempDir": false,
+	"cleanTempDir": true,
 	"tempDirName": ".stryker-tmp",
 	"plugins": ["@stryker-mutator/vitest-runner"]
 }

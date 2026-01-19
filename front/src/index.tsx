@@ -39,16 +39,15 @@ const boostrap = async () => {
 	const runtime = new AppRuntime(dashboard, coordinator);
 	runtime.start();
 
-	if (root) {
-		render(
-			() => (
-				<DashboardContext.Provider value={dashboard}>
-					<App />
-				</DashboardContext.Provider>
-			),
-			root,
-		);
-	}
+	render(
+		() => (
+			<DashboardContext.Provider value={dashboard}>
+				<App />
+			</DashboardContext.Provider>
+		),
+		// biome-ignore lint/style/noNonNullAssertion: always a root node
+		root!,
+	);
 };
 
 boostrap();

@@ -18,7 +18,10 @@ export default defineConfig({
 	],
 	server: {
 		fs: {
-			allow: [".."],
+			allow: [
+				// path.resolve(__dirname),
+				path.resolve(__dirname, "../../node_modules"),
+			],
 		},
 	},
 	resolve: {

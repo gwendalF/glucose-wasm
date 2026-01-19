@@ -9,5 +9,5 @@
 		"editor.defaultFormatter": "biomejs.biome"
 	},
 	"biome.configurationPath": "./front/biome.json",
-	"biome.lsp.bin": "./front/node_modules/.bin/biome.ps1"
+	"biome.lsp.bin": "./front/node_modules/.bin/biome"
 }
