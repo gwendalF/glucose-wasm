@@ -1,3 +1,4 @@
+import type { Stream } from "@domain/Stream";
 import {
 	fromDate,
 	HOURS,
@@ -6,12 +7,7 @@ import {
 	timestamp,
 } from "@domain/TimeRange";
 import { describe, test } from "vitest";
-import {
-	Dashboard,
-	type DashboardState,
-	type GlucoseValue,
-	type Stream,
-} from "./Dashboard";
+import { Dashboard, type DashboardState, type GlucoseValue } from "./Dashboard";
 
 describe("Dashboard", () => {
 	type Params = {
@@ -52,7 +48,7 @@ describe("Dashboard", () => {
 				}
 			},
 			repo: {
-				async fetch(_range: TimeRange) {
+				async load(_range: TimeRange) {
 					return repoValues;
 				},
 				watch: watchFn,
@@ -84,7 +80,7 @@ describe("Dashboard", () => {
 	test("default preset is last24hours", async ({ expect }) => {
 		let timeRange: TimeRange | undefined;
 		const repo = {
-			async fetch(range: TimeRange) {
+			async load(range: TimeRange) {
 				timeRange = range;
 				return [];
 			},
@@ -105,7 +101,7 @@ describe("Dashboard", () => {
 	}) => {
 		let timeRange: TimeRange | undefined;
 		const repo = {
-			async fetch(range: TimeRange) {
+			async load(range: TimeRange) {
 				timeRange = range;
 				return [];
 			},
@@ -147,7 +143,7 @@ describe("Dashboard", () => {
 	test("does not reload data if end does not change", async ({ expect }) => {
 		let timeRange: TimeRange | undefined;
 		const repo = {
-			async fetch(range: TimeRange) {
+			async load(range: TimeRange) {
 				timeRange = range;
 				return [];
 			},
@@ -168,7 +164,7 @@ describe("Dashboard", () => {
 	test("keeps selected window when updating end", async ({ expect }) => {
 		let timeRange: TimeRange | undefined;
 		const repo = {
-			async fetch(range: TimeRange) {
+			async load(range: TimeRange) {
 				timeRange = range;
 				return [];
 			},
@@ -190,7 +186,7 @@ describe("Dashboard", () => {
 
 	test("initial snapshot is idle and empty", async ({ expect }) => {
 		const repo = {
-			async fetch(_range: TimeRange) {
+			async load(_range: TimeRange) {
 				return [];
 			},
 			watch: emptyWatch,
@@ -203,7 +199,7 @@ describe("Dashboard", () => {
 
 	test("subscribe receives immediate snapshot", ({ expect }) => {
 		const repo = {
-			async fetch(_range: TimeRange) {
+			async load(_range: TimeRange) {
 				return [];
 			},
 			watch: emptyWatch,

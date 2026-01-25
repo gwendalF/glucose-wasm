@@ -5,14 +5,14 @@ import "@unocss/reset/eric-meyer.css";
 
 import { AppRuntime } from "@application/AppRuntime";
 import { SyncCoordinator } from "@application/SyncCoordinator";
-import { type GlucoseSyncRepo, SyncRange } from "@domain/SyncRange";
+import type { GlucosStore } from "@domain/GlucoseStore";
+import type { GlucoseSyncStore } from "@domain/GlucoseSyncStore";
+import { SyncRange } from "@domain/SyncRange";
+import type { TransactionRangeRunner } from "@domain/TransactionRangeRunner";
+import { SqlTransactionRangeRunner } from "@infra/SqlTransactionRangeRunner";
 import { HttpSyncSource } from "@infra/SyncSource";
-import { Dashboard, type GlucoseRepository } from "./application/Dashboard";
-import {
-	InMemoryRepository,
-	SQLite,
-	SQLRepository,
-} from "./infrastructure/GlucoseRepository";
+import { Dashboard } from "./application/Dashboard";
+import { InMemoryStore, SQLite, SQLStore } from "./infrastructure/GlucoseStore";
 import { App } from "./ui/App";
 import { DashboardContext } from "./ui/DashboardContext";
 
@@ -25,17 +25,28 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
 }
 
 const boostrap = async () => {
-	let repository: GlucoseRepository & GlucoseSyncRepo;
+	let store: GlucosStore & GlucoseSyncStore;
+	let txStore: TransactionRangeRunner;
 	if (import.meta.env.DEV) {
-		repository = new InMemoryRepository({ withRandom: true });
+		const inMemory = new InMemoryStore({ withRandom: true });
+		store = inMemory;
+		txStore = {
+			run: async (fn) => {
+				return fn(inMemory);
+			},
+		};
 	} else {
 		const sqlLocal = await SQLite.create(":memory:");
-		repository = new SQLRepository(sqlLocal.database());
+		const sql = new SQLStore(sqlLocal.database());
+		store = sql;
+		txStore = new SqlTransactionRangeRunner(sql);
 	}
 
 	const source = new HttpSyncSource();
-	const coordinator = new SyncCoordinator(new SyncRange(repository, source));
-	const dashboard = new Dashboard(repository);
+	const coordinator = new SyncCoordinator(
+		new SyncRange(store, txStore, source),
+	);
+	const dashboard = new Dashboard(store);
 	const runtime = new AppRuntime(dashboard, coordinator);
 	runtime.start();
 

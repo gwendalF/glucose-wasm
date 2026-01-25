@@ -1,3 +1,5 @@
+import type { GlucosStore } from "@domain/GlucoseStore";
+import type { Unsubcribe } from "@domain/Stream";
 import {
 	type TimePreset,
 	TimePresets,
@@ -13,26 +15,17 @@ export type GlucoseValue = {
 
 type DashboardStatus = "idle" | "loading" | "ready";
 
-export interface Stream<T> {
-	subscribe(cb: (v: T) => void): Unsubcribe;
-}
-
 export type DashboardState = {
 	status: DashboardStatus;
 	values: GlucoseValue[];
 	currentEnd?: Timestamp;
 	range?: TimeRange;
 };
-export interface GlucoseRepository {
-	fetch(range: TimeRange): Promise<GlucoseValue[]>;
-	watch(range: TimeRange): Stream<GlucoseValue[]>;
-}
 
-type Unsubcribe = () => void;
 export type GlucoseListener = (state: DashboardState) => void;
 
 export class Dashboard {
-	private repo: GlucoseRepository;
+	private repo: GlucosStore;
 	private values: GlucoseValue[] = [];
 	private status: DashboardStatus = "idle";
 
@@ -41,7 +34,7 @@ export class Dashboard {
 	private listeners: Set<GlucoseListener> = new Set();
 	private unsubscribeRepo?: Unsubcribe;
 
-	constructor(repo: GlucoseRepository) {
+	constructor(repo: GlucosStore) {
 		this.repo = repo;
 	}
 
@@ -58,14 +51,14 @@ export class Dashboard {
 
 		this.preset = preset;
 		this.setState({ status: "loading", currentEnd: end });
-		const data = await this.repo.fetch(range);
+		const data = await this.repo.load(range);
 		this.setState({ values: data, status: "ready" });
 	};
 
 	updateEnd = async (to: Timestamp) => {
 		const range = timeRangeFor(this.preset, to);
 		this.setState({ status: "loading", currentEnd: to });
-		const data = await this.repo.fetch(range);
+		const data = await this.repo.load(range);
 		this.setState({ values: data, status: "ready" });
 	};
 

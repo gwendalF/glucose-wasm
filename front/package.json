@@ -10,6 +10,7 @@
 		"serve": "vite preview",
 		"test": "vitest --project unit --project ui",
 		"test:all": "vitest",
+		"test:browser": "vitest --project browser",
 		"check": "biome check --write",
 		"type-check": "tsc --noEmit"
 	},

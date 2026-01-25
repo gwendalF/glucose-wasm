@@ -5,13 +5,21 @@ export type TimeRange = {
 
 export type Timestamp = number & { __brand: "Timestamp" };
 
-export const timestamp = (msNumber: number): Timestamp => {
+export function timestamp(msNumber: number): Timestamp {
 	return msNumber as Timestamp;
-};
+}
 
-export const fromDate = (date: Date): Timestamp => {
+export function minTimestamp(...timestamps: Timestamp[]): Timestamp {
+	return timestamp(Math.min(...timestamps));
+}
+
+export function maxTimestamp(...timestamps: Timestamp[]): Timestamp {
+	return timestamp(Math.max(...timestamps));
+}
+
+export function fromDate(date: Date): Timestamp {
 	return date.getTime() as Timestamp;
-};
+}
 
 export const TimePresets = {
 	Last6Hours: "Last6Hours",

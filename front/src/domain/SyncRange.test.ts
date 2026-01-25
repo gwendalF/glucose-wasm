@@ -1,16 +1,33 @@
 import { describe, test, vi } from "vitest";
-import { type GlucoseSyncRepo, SyncRange } from "./SyncRange";
+import type { GlucoseSyncStore } from "./GlucoseSyncStore";
+import { SyncRange } from "./SyncRange";
 import type { SyncSource } from "./SyncSource";
-import { fromDate, timestamp } from "./TimeRange";
+import { fromDate, type TimeRange, timestamp } from "./TimeRange";
+import type { TransactionRangeRunner } from "./TransactionRangeRunner";
+import type { TransactionRangeStore } from "./TransactionRangeStore";
 
 describe("SyncRange check repo calls", ({ beforeEach }) => {
-	let repo: GlucoseSyncRepo;
+	let store: GlucoseSyncStore;
+	let txStore: TransactionRangeStore;
+	let txRangeRunner: TransactionRangeRunner;
+
 	beforeEach(() => {
-		repo = {
-			insertItems: vi.fn(),
+		const insertItems = vi.fn();
+		const getMissingRanges = async (requested: TimeRange) => {
+			return [requested];
+		};
+		store = {
+			insertItems,
+			getMissingRanges,
+		};
+		txStore = {
+			insertItems,
+			getMissingRanges,
 			markRangeComplete: vi.fn(),
-			getMissingRanges: async (requested) => {
-				return [requested];
+		};
+		txRangeRunner = {
+			run: async (fn) => {
+				return fn(txStore);
 			},
 		};
 	});
@@ -24,15 +41,15 @@ describe("SyncRange check repo calls", ({ beforeEach }) => {
 			}),
 		};
 
-		const sync = new SyncRange(repo, source);
+		const sync = new SyncRange(store, txRangeRunner, source);
 
 		await sync.run({
 			from: timestamp(1000),
 			to: timestamp(2000),
 		});
 
-		expect(repo.insertItems).toHaveBeenCalledOnce();
-		expect(repo.markRangeComplete).toHaveBeenCalledOnce();
+		expect(store.insertItems).toHaveBeenCalledOnce();
+		expect(txStore.markRangeComplete).toHaveBeenCalledOnce();
 	});
 
 	test("does not fetch data when to is before from", async ({ expect }) => {
@@ -44,7 +61,7 @@ describe("SyncRange check repo calls", ({ beforeEach }) => {
 			}),
 		};
 
-		const sync = new SyncRange(repo, source);
+		const sync = new SyncRange(store, txRangeRunner, source);
 		await sync.run({
 			from: timestamp(456),
 			to: timestamp(123),
@@ -64,15 +81,15 @@ describe("SyncRange check repo calls", ({ beforeEach }) => {
 			}),
 		};
 
-		const sync = new SyncRange(repo, source);
+		const sync = new SyncRange(store, txRangeRunner, source);
 
 		await sync.run({
 			from: fromDate(new Date("2026-01-01T12:00:00.000Z")),
 			to: fromDate(new Date("2026-01-01T18:00:00.000Z")),
 		});
 
-		expect(repo.insertItems).not.toHaveBeenCalled();
-		expect(repo.markRangeComplete).toHaveBeenCalledOnce();
+		expect(store.insertItems).not.toHaveBeenCalled();
+		expect(txStore.markRangeComplete).toHaveBeenCalledOnce();
 	});
 
 	test("does not markRangeComplete if not completed", async ({ expect }) => {
@@ -83,13 +100,13 @@ describe("SyncRange check repo calls", ({ beforeEach }) => {
 			}),
 		};
 
-		const sync = new SyncRange(repo, source);
+		const sync = new SyncRange(store, txRangeRunner, source);
 		await sync.run({
 			from: fromDate(new Date("2026-01-01T12:00:00.000Z")),
 			to: fromDate(new Date("2026-01-31T12:00:00.000Z")),
 		});
 
-		expect(repo.markRangeComplete).not.toHaveBeenCalled();
+		expect(txStore.markRangeComplete).not.toHaveBeenCalled();
 	});
 
 	test("refetches remaining range if server returns a smaller completed range than requested", async ({
@@ -109,13 +126,13 @@ describe("SyncRange check repo calls", ({ beforeEach }) => {
 				}),
 		};
 
-		const sync = new SyncRange(repo, source);
+		const sync = new SyncRange(store, txRangeRunner, source);
 
 		await sync.run({ from: timestamp(100), to: timestamp(300) });
 
 		expect(source.fetchBatch).toHaveBeenCalledTimes(2);
-		expect(repo.insertItems).toHaveBeenCalledTimes(1);
-		expect(repo.markRangeComplete).toHaveBeenCalledOnce();
+		expect(store.insertItems).toHaveBeenCalledTimes(1);
+		expect(txStore.markRangeComplete).toHaveBeenCalledOnce();
 	});
 
 	test("don't refetch already completed ranges", async ({ expect }) => {
@@ -136,14 +153,14 @@ describe("SyncRange check repo calls", ({ beforeEach }) => {
 				}),
 		};
 
-		let sync = new SyncRange(repo, source);
+		let sync = new SyncRange(store, txRangeRunner, source);
 		await sync.run({ from: timestamp(0), to: timestamp(200) });
 
 		source.fetchBatch.mockClear();
-		repo.getMissingRanges = async () => {
+		store.getMissingRanges = async () => {
 			return [];
 		};
-		sync = new SyncRange(repo, source);
+		sync = new SyncRange(store, txRangeRunner, source);
 
 		await sync.run({ from: timestamp(0), to: timestamp(500) });
 		expect(source.fetchBatch).not.toHaveBeenCalled();
@@ -171,13 +188,13 @@ describe("SyncRange check repo calls", ({ beforeEach }) => {
 					}),
 			};
 
-			repo.getMissingRanges = async () => {
+			store.getMissingRanges = async () => {
 				return [
 					{ from: timestamp(0), to: timestamp(400) },
 					{ from: timestamp(500), to: timestamp(800) },
 				];
 			};
-			const sync = new SyncRange(repo, source);
+			const sync = new SyncRange(store, txRangeRunner, source);
 
 			await sync.run({ from: timestamp(0), to: timestamp(1000) });
 			expect(source.fetchBatch).toHaveBeenCalledTimes(2);
@@ -198,10 +215,10 @@ describe("SyncRange check repo calls", ({ beforeEach }) => {
 				fetchBatch: vi.fn<SyncSource["fetchBatch"]>(),
 			};
 
-			repo.getMissingRanges = async () => {
+			store.getMissingRanges = async () => {
 				return [];
 			};
-			const sync = new SyncRange(repo, source);
+			const sync = new SyncRange(store, txRangeRunner, source);
 			await sync.run({ from: timestamp(0), to: timestamp(1000) });
 			expect(source.fetchBatch).not.toHaveBeenCalled();
 		});
