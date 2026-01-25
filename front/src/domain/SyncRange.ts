@@ -1,12 +1,7 @@
-import type { GlucoseValue } from "@application/Dashboard";
+import type { GlucoseSyncStore } from "./GlucoseSyncStore";
 import type { SyncSource } from "./SyncSource";
 import type { TimeRange } from "./TimeRange";
-
-export interface GlucoseSyncRepo {
-	insertItems(items: readonly GlucoseValue[]): Promise<void>;
-	markRangeComplete(range: TimeRange): Promise<void>;
-	getMissingRanges(requested: TimeRange): Promise<TimeRange[]>;
-}
+import type { TransactionRangeRunner } from "./TransactionRangeRunner";
 
 export interface RangeSynchronizer {
 	run: (range: TimeRange) => Promise<void>;
@@ -14,12 +9,13 @@ export interface RangeSynchronizer {
 
 export class SyncRange implements RangeSynchronizer {
 	constructor(
-		private readonly repo: GlucoseSyncRepo,
+		private readonly store: GlucoseSyncStore,
+		private readonly txRunner: TransactionRangeRunner,
 		private readonly source: SyncSource,
 	) {}
 
 	run = async (range: TimeRange) => {
-		const ranges = await this.repo.getMissingRanges(range);
+		const ranges = await this.store.getMissingRanges(range);
 		for (const range of ranges) {
 			await this.runOneRange(range);
 		}
@@ -34,8 +30,10 @@ export class SyncRange implements RangeSynchronizer {
 					from,
 					to: batch.coveredRange.to,
 				};
+				await this.txRunner.run(async (txRepo) => {
+					await txRepo.markRangeComplete(coveredRange);
+				});
 
-				await this.repo.markRangeComplete(coveredRange);
 				from = batch.coveredRange.to;
 			} else {
 				break;
@@ -46,7 +44,7 @@ export class SyncRange implements RangeSynchronizer {
 	private fetchAndInsert = async (range: TimeRange) => {
 		const batch = await this.source.fetchBatch(range);
 		if (batch.items.length > 0) {
-			await this.repo.insertItems(batch.items);
+			await this.store.insertItems(batch.items);
 		}
 
 		return batch;
