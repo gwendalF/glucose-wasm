@@ -1,6 +1,7 @@
 import { timestamp } from "@domain/TimeRange";
-import { describe, test } from "vitest";
-import { MergeError, mergeRanges } from "./mergeRanges";
+import { describe, expect, test } from "vitest";
+import { computeMissingRanges, MergeError, mergeRanges } from "./ranges";
+import { from } from "solid-js";
 
 describe("mergeRanges", () => {
 	test("returns Err when ranges is empty", ({ expect }) => {
@@ -68,5 +69,56 @@ describe("mergeRanges", () => {
 		if (!result.ok) {
 			expect(result.error.code).toBe("INVALID_RANGE");
 		}
+	});
+});
+
+describe("computeMissingRanges", () => {
+	test("returns full range if no completed ranges", ({ expect }) => {
+		const requested = { from: timestamp(10), to: timestamp(20) };
+		expect(computeMissingRanges(requested, [])).toEqual([requested]);
+	});
+
+	test.for([
+		[
+			{ from: timestamp(10), to: timestamp(20) },
+			[{ from: timestamp(10), to: timestamp(20) }],
+			[],
+		],
+		[
+			{ from: timestamp(15), to: timestamp(20) },
+			[{ from: timestamp(5), to: timestamp(25) }],
+			[],
+		],
+		[
+			{ from: timestamp(100), to: timestamp(500) },
+			[{ from: timestamp(200), to: timestamp(300) }],
+			[
+				{ from: timestamp(100), to: timestamp(200) },
+				{ from: timestamp(300), to: timestamp(500) },
+			],
+		],
+		[
+			{ from: timestamp(100), to: timestamp(500) },
+			[{ from: timestamp(50), to: timestamp(200) }],
+			[{ from: timestamp(200), to: timestamp(500) }],
+		],
+		[
+			{ from: timestamp(10), to: timestamp(500) },
+			[
+				{ from: timestamp(50), to: timestamp(100) },
+				{ from: timestamp(300), to: timestamp(400) },
+			],
+			[
+				{ from: timestamp(10), to: timestamp(50) },
+				{ from: timestamp(100), to: timestamp(300) },
+				{ from: timestamp(400), to: timestamp(500) },
+			],
+		],
+	] as const)("requested: %o, completed: %o", ([
+		requested,
+		completed,
+		expected,
+	]) => {
+		expect(computeMissingRanges(requested, completed)).toEqual(expected);
 	});
 });

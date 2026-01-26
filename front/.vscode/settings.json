@@ -7,9 +7,5 @@
 	},
 	"[jsonc]": {
 		"editor.defaultFormatter": "biomejs.biome"
-	},
-	"files.exclude": {
-		"front":true,
-		"back":true
 	}
 }

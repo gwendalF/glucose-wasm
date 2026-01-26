@@ -6,7 +6,7 @@ import type { Stream } from "@domain/Stream";
 import { type TimeRange, timestamp } from "@domain/TimeRange";
 import type { TransactionRangeStore } from "@domain/TransactionRangeStore";
 import { SQLocal, type Transaction } from "sqlocal";
-import { mergeRanges } from "./mergeRanges";
+import { computeMissingRanges, mergeRanges } from "./ranges";
 
 export class SQLStore implements GlucosStore, GlucoseSyncStore {
 	private db: SQLocal;
@@ -74,8 +74,14 @@ export class SQLStore implements GlucosStore, GlucoseSyncStore {
 	}
 
 	async getMissingRanges(requested: TimeRange): Promise<TimeRange[]> {
-		const await this.sql``
-		return [requested];
+		const completedRows = await this
+			.sql`SELECT start, end  FROM completed_ranges WHERE start <= ${requested.to} AND end >= ${requested.from} ORDER BY start ASC`;
+		const completed = completedRows.map((r) => ({
+			from: timestamp(r.start),
+			to: timestamp(r.end),
+		}));
+
+		return computeMissingRanges(requested, completed);
 	}
 
 	// biome-ignore lint/suspicious/noExplicitAny: any type from SQL

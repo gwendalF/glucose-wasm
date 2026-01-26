@@ -47,6 +47,13 @@ export default defineConfig({
 			{
 				extends: true,
 				test: {
+					name: "node",
+					include: ["tests/**/*.{test,spec}.ts"],
+				},
+			},
+			{
+				extends: true,
+				test: {
 					name: "browser",
 					include: ["tests/**/*.{test,spec}.ts"],
 					browser: {

@@ -8,7 +8,7 @@
 		"dev": "vite",
 		"build": "vite build",
 		"serve": "vite preview",
-		"test": "vitest --project unit --project ui",
+		"test": "vitest --project unit --project ui --project node",
 		"test:all": "vitest",
 		"test:browser": "vitest --project browser",
 		"check": "biome check --write",

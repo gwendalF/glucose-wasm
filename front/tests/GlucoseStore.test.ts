@@ -147,4 +147,18 @@ describe("SQLite glucose repository", () => {
 			{ from: timestamp(10), to: timestamp(1234) },
 		]);
 	});
+
+	test("non intersecting range is irrelevant", async ({ expect }) => {
+		const { repo, db } = await setupRepo();
+
+		await db.sql`INSERT INTO completed_ranges (start, end) VALUES (${timestamp(1234)}, ${timestamp(4567)}), (${timestamp(5000)}, ${timestamp(6000)})`;
+
+		const ranges = await repo.getMissingRanges({
+			from: timestamp(10),
+			to: timestamp(2000),
+		});
+		expect(ranges).toMatchObject([
+			{ from: timestamp(10), to: timestamp(1234) },
+		]);
+	});
 });
