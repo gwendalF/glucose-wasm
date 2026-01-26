@@ -45,3 +45,31 @@ export function mergeRanges(
 
 	return Ok({ from, to });
 }
+
+export function computeMissingRanges(
+	requested: TimeRange,
+	completed: readonly TimeRange[],
+): TimeRange[] {
+	let from = requested.from;
+	const missing: TimeRange[] = [];
+	for (const range of completed) {
+		if (range.from >= requested.to) {
+			break;
+		}
+
+		if (range.from > from) {
+			missing.push({ from, to: range.from });
+		}
+
+		from = maxTimestamp(range.to, from);
+		if (from >= requested.to) {
+			return missing;
+		}
+	}
+
+	if (from < requested.to) {
+		missing.push({ from, to: requested.to });
+	}
+
+	return missing;
+}
