@@ -1,7 +1,6 @@
 import { timestamp } from "@domain/TimeRange";
 import { describe, expect, test } from "vitest";
 import { computeMissingRanges, MergeError, mergeRanges } from "./ranges";
-import { from } from "solid-js";
 
 describe("mergeRanges", () => {
 	test("returns Err when ranges is empty", ({ expect }) => {
@@ -29,11 +28,12 @@ describe("mergeRanges", () => {
 		const result = mergeRanges([
 			{ from: timestamp(10), to: timestamp(20) },
 			{ from: timestamp(15), to: timestamp(30) },
+			{ from: timestamp(25), to: timestamp(50) },
 		]);
 
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.value).toEqual({ from: timestamp(10), to: timestamp(30) });
+			expect(result.value).toEqual({ from: timestamp(10), to: timestamp(50) });
 		}
 	});
 

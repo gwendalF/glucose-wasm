@@ -25,6 +25,7 @@ front/reports
 
 #tests
 *.stryker-tmp
+front/reports
 
 # IDEs and editors
 /.idea
