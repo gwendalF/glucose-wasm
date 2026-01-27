@@ -16,9 +16,12 @@ node_modules
 
 #db
 back/db
+db.sqlite
+androidaps.db
 
 #tests
 *.stryker-tmp
+front/reports
 
 # IDEs and editors
 /.idea

@@ -18,7 +18,7 @@ export default defineConfig({
 	],
 	server: {
 		fs: {
-			allow: [".."],
+			allow: ["../.."],
 		},
 	},
 	resolve: {
@@ -31,8 +31,11 @@ export default defineConfig({
 	},
 	test: {
 		environment: "happy-dom",
-		include: ["src/**/*.{test,spec}.ts", "src/**/*.{test,spec}.tsx"],
-		exclude: ["tests/**/*"],
+		include: [
+			"src/**/*.{test,spec}.ts",
+			"src/**/*.{test,spec}.tsx",
+			"tests/**/*.test.ts",
+		],
 	},
 	build: {
 		target: "esnext",

@@ -1,3 +1,7 @@
 fn main() {
-    println!("Hello, world!");
+    let args = std::env::args();
+    match glucose_wasm::commands::run(args.collect()) {
+        Ok(()) => (),
+        Err(e) => println!("{e}"),
+    }
 }

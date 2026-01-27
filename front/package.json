@@ -12,7 +12,8 @@
 		"test:all": "vitest",
 		"test:browser": "vitest --project browser",
 		"check": "biome check --write",
-		"type-check": "tsc --noEmit"
+		"type-check": "tsc --noEmit",
+		"mutant": "stryker run"
 	},
 	"license": "MIT",
 	"devDependencies": {
