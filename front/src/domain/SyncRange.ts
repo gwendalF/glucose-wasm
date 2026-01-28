@@ -23,6 +23,7 @@ export class SyncRange implements RangeSynchronizer {
 
 	private runOneRange = async (range: TimeRange) => {
 		let from = range.from;
+
 		while (from < range.to) {
 			const batch = await this.fetchAndInsert({ from: from, to: range.to });
 			if (batch.status === "complete") {

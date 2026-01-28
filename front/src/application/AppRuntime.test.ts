@@ -111,4 +111,24 @@ describe("the dashboard show local data and trigger a background sync to get rem
 			to: later,
 		});
 	});
+
+	test("AppRuntime should NOT retrigger sync in loop", async ({ expect }) => {
+		const repo = new InMemoryStore({ data: [] });
+		const sync = new SyncRange(repo, makeTxStore(repo), {
+			fetchBatch: async () => ({ items: [], status: "pending" }),
+		});
+		const dashboard = new Dashboard(repo);
+		const coordinator = new SyncCoordinator(sync);
+		const spy = vi.spyOn(coordinator, "requestRange");
+		const appRuntime = new AppRuntime(dashboard, coordinator);
+		appRuntime.start();
+
+		const end = timestamp(Date.now());
+		await dashboard.loadData({ end });
+		expect(spy).toHaveBeenCalledOnce();
+
+		// simulate emit with same range
+		dashboard.updateEnd(end);
+		expect(spy).toHaveBeenCalledOnce();
+	});
 });
