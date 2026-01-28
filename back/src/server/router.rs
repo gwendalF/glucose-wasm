@@ -51,10 +51,38 @@ async fn list_glucose_values(
     let to = DateTime::from_timestamp_millis(query.to)?;
     let now = time::Instant::now();
     let measurements = store.load(from, to, 1000).unwrap();
-    let elapsed = now.elapsed().as_millis();
+    let elapsed = now.elapsed().as_micros();
 
-    res.add_header("Server-Timing", format!("db;dur={elapsed}"), true)
+    let covered_range = if measurements.complete {
+        TimeRange {
+            from: query.from,
+            to: query.to,
+        }
+    } else {
+        TimeRange { from: 0, to: 0 }
+    };
+
+    res.add_header("Server-Timing", format!("db;dur={elapsed} us"), true)
         .unwrap()
-        .render(Json(measurements));
+        .render(Json(MeasurementsDto {
+            complete: measurements.complete,
+            timestamps: measurements.timestamps,
+            values: measurements.values,
+            covered_range,
+        }));
     Some(())
+}
+
+#[derive(Serialize)]
+struct MeasurementsDto<'a> {
+    complete: bool,
+    timestamps: &'a [i64],
+    values: &'a [u16],
+    covered_range: TimeRange,
+}
+
+#[derive(Serialize)]
+struct TimeRange {
+    from: i64,
+    to: i64,
 }

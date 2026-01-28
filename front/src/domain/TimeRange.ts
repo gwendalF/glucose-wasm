@@ -25,6 +25,7 @@ export const TimePresets = {
 	Last6Hours: "Last6Hours",
 	Last12Hours: "Last12Hours",
 	Last24Hours: "Last24Hours",
+	LastYear: "Lastyear",
 } as const;
 
 export const HOURS = 1000 * 60 * 60;
@@ -43,6 +44,8 @@ export const presetMs = (preset: TimePreset): number => {
 		case "Last12Hours":
 			durationMs = 12 * HOURS;
 			break;
+		case "Lastyear":
+			durationMs = 365 * 24 * HOURS;
 	}
 
 	return durationMs;

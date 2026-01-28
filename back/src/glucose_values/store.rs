@@ -4,9 +4,9 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct Measurements<'a> {
-    timestamps: &'a [i64],
-    values: &'a [u16],
-    complete: bool,
+    pub timestamps: &'a [i64],
+    pub values: &'a [u16],
+    pub complete: bool,
 }
 
 struct OwnedData {
@@ -92,7 +92,10 @@ impl GlucoseStore for Store {
             .partition_point(|&timestamp| timestamp <= to);
 
         let to_idx = std::cmp::min(target_to_idx, from_idx + limit);
-        let is_complete = to_idx == from_idx + limit;
+
+        let is_after_start = from_idx > 0;
+        let is_before_end = target_to_idx < data.timestamps.len();
+        let is_complete = is_after_start && is_before_end;
 
         let timestamps = &data.timestamps[from_idx..to_idx];
         let values = &data.values[from_idx..to_idx];

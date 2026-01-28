@@ -1,3 +1,4 @@
+import type { TimeRange } from "@domain/TimeRange";
 import {
 	createContext,
 	createEffect,
@@ -6,7 +7,6 @@ import {
 	useContext,
 } from "solid-js";
 import type { Dashboard, DashboardState } from "../application/Dashboard";
-import type { TimeRange } from "../domain/TimeRange";
 
 export const DashboardContext = createContext<Dashboard>();
 

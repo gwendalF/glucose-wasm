@@ -64,22 +64,22 @@ export class Dashboard {
 
 	glucoseValues = (): GlucoseValue[] => this.values;
 
-	getSnapshot = (): DashboardState => {
+	getSnapshot(): DashboardState {
 		return {
 			status: this.status,
 			values: this.values,
 			currentEnd: this.currentEnd,
 			range: this.range(),
 		};
-	};
+	}
 
-	subscribe = (cb: (state: DashboardState) => void): Unsubcribe => {
+	subscribe(cb: (state: DashboardState) => void): Unsubcribe {
 		this.listeners.add(cb);
 		cb(this.getSnapshot());
 		return () => this.listeners.delete(cb);
-	};
+	}
 
-	connect = (range: TimeRange) => {
+	connect(range: TimeRange) {
 		this.unsubscribeRepo?.();
 
 		this.setState({ status: "loading", currentEnd: range.to });
@@ -87,18 +87,18 @@ export class Dashboard {
 		this.unsubscribeRepo = stream.subscribe((values) => {
 			this.setState({ status: "ready", values, currentEnd: range.to });
 		});
-	};
+	}
 
-	getEnd = () => {
+	getEnd() {
 		return this.currentEnd;
-	};
+	}
 
-	private range = () => {
+	private range() {
 		const end = this.getEnd();
 		if (!end) return;
 
 		return timeRangeFor(this.preset, end);
-	};
+	}
 
 	private setState(s: Partial<DashboardState>) {
 		if (s.status) this.status = s.status;
@@ -113,4 +113,12 @@ export class Dashboard {
 			listener(snapshot);
 		}
 	}
+
+	async fullScanSince(firstDate: Timestamp, delayMs: number) {
+		const range = timeRangeFor(TimePresets.LastYear, new Date());
+	}
+}
+
+async function sleep(ms: number) {
+	return new Promise((r) => setTimeout(r, ms));
 }
