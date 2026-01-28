@@ -22,7 +22,7 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
             load_db::load_db(&args[2], new_file).map_err(|e| e.to_string())
         }
         "run" => {
-            println!("{:?}", server::run());
+            println!("Server output: {:?}", server::run());
             Ok(())
         }
         _ => Err(String::from("unknow command")),
