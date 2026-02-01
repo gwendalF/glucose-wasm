@@ -1,3 +1,5 @@
+import type { GlucoseValue } from "./GlucoseValue";
+
 export type TimeRange = {
 	from: Timestamp;
 	to: Timestamp;
@@ -19,6 +21,35 @@ export function maxTimestamp(...timestamps: Timestamp[]): Timestamp {
 
 export function fromDate(date: Date): Timestamp {
 	return date.getTime() as Timestamp;
+}
+
+export class RangeSet {
+	private knownRanges: TimeRange[];
+
+	constructor(readonly known: TimeRange[]) {
+		this.knownRanges = [...known].sort((a, b) => a.from - b.from);
+	}
+
+	resolveMissingRanges(requested: TimeRange): TimeRange[] {
+		const result: TimeRange[] = [];
+		let cursor = requested.from;
+		for (const known of this.knownRanges) {
+			const from = maxTimestamp(known.from, requested.from);
+			const to = minTimestamp(known.to, requested.to);
+
+			if (from > cursor) {
+				result.push({ from: cursor, to: from });
+			}
+
+			cursor = maxTimestamp(cursor, to);
+		}
+
+		if (cursor < requested.to) {
+			result.push({ from: cursor, to: requested.to });
+		}
+
+		return result;
+	}
 }
 
 export const TimePresets = {

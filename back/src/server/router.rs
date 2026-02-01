@@ -39,17 +39,3 @@ pub fn router<T: StoreBound>(config: &ServerConfig, store: T) -> salvo::Router {
             ),
         )
 }
-
-#[derive(Serialize)]
-struct MeasurementsDto<'a> {
-    complete: bool,
-    timestamps: &'a [i64],
-    values: &'a [u16],
-    covered_range: TimeRange,
-}
-
-#[derive(Serialize)]
-struct TimeRange {
-    from: i64,
-    to: i64,
-}
