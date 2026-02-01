@@ -1,8 +1,10 @@
-import type { GlucoseValue } from "@application/Dashboard";
-import type { Stream } from "./Stream";
+import type { GlucoseValue } from "./GlucoseValue";
 import type { TimeRange } from "./TimeRange";
 
-export interface GlucosStore {
-	load(range: TimeRange): Promise<GlucoseValue[]>;
-	watch(range: TimeRange): Stream<GlucoseValue[]>;
+export interface LocalStore {
+	addMeasurements(measurements: GlucoseValue[]): Promise<void>;
+	getKnownRanges(): Promise<TimeRange[]>;
+	addRanges(ranges: TimeRange[]): Promise<void>;
+	loadMeasurements(range: TimeRange): Promise<GlucoseValue[]>;
+	subscribe(fn: () => void): () => void;
 }

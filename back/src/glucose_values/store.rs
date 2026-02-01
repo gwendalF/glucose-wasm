@@ -6,7 +6,7 @@ use serde::Serialize;
 pub struct Measurements<'a> {
     pub timestamps: &'a [i64],
     pub values: &'a [u16],
-    pub complete: bool,
+    pub has_more: bool,
 }
 
 struct OwnedData {
@@ -93,9 +93,8 @@ impl GlucoseStore for Store {
 
         let to_idx = std::cmp::min(target_to_idx, from_idx + limit);
 
-        let is_after_start = from_idx > 0;
         let is_before_end = target_to_idx < data.timestamps.len();
-        let is_complete = is_after_start && is_before_end;
+        let has_more = is_before_end && (to_idx == from_idx + limit);
 
         let timestamps = &data.timestamps[from_idx..to_idx];
         let values = &data.values[from_idx..to_idx];
@@ -103,11 +102,11 @@ impl GlucoseStore for Store {
         Ok(Measurements {
             timestamps,
             values,
-            complete: is_complete,
+            has_more,
         })
     }
 
-    fn insert(&self, values: &Measurements) -> Result<(), String> {
+    fn insert(&self, _values: &Measurements) -> Result<(), String> {
         todo!()
     }
 }

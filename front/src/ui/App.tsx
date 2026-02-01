@@ -1,37 +1,50 @@
-import { createSignal } from "solid-js";
+import {
+	createEffect,
+	createResource,
+	createSignal,
+	onCleanup,
+	onMount,
+} from "solid-js";
 import Left from "~icons/ant-design/arrow-left-outlined";
 import Right from "~icons/ant-design/arrow-right-outlined";
-import type { Dashboard } from "../application/Dashboard";
+
 import {
-	HOURS,
+	fromDate,
 	presetMs,
 	type TimePreset,
 	TimePresets,
 	timeRangeFor,
 	timestamp,
 } from "../domain/TimeRange";
-import { useDashboard, useDashboardState } from "./DashboardContext";
+
 import { Graph } from "./Graph";
+import { useSyncer } from "./syncerContext";
 
 export const App = () => {
-	const dashboard = useDashboard();
+	const syncer = useSyncer();
 	const [end, setEnd] = createSignal(new Date("2026-01-1"));
 	const [preset, _] = createSignal<TimePreset>(TimePresets.Last24Hours);
+	const range = () => timeRangeFor(preset(), fromDate(end()));
 
-	const state = useDashboardState(dashboard, () => {
-		const currentEnd = end().getTime();
-		return {
-			from: timestamp(currentEnd - 24 * HOURS),
-			to: timestamp(currentEnd),
-		};
+	const [data, { refetch }] = createResource(range, (r) => {
+		return syncer.getMeasurements(r);
+	});
+
+	onMount(() => {
+		const unsub = syncer.onChange(() => refetch());
+		onCleanup(unsub);
+	});
+
+	createEffect(() => {
+		syncer.fetchMissing(range());
 	});
 
 	return (
 		<div class="h-full flex flex-col">
-			<Header dashboard={dashboard} preset={preset} end={end} setEnd={setEnd} />
+			<Header preset={preset} end={end} setEnd={setEnd} />
 			<Graph
 				timeWindow={() => TimePresets.Last24Hours}
-				glucose={() => state().values}
+				glucose={data}
 				class={() => "grow"}
 			/>
 		</div>
@@ -39,19 +52,18 @@ export const App = () => {
 };
 
 const Header = (props: {
-	dashboard: Dashboard;
 	preset: () => TimePreset;
 	end: () => Date;
 	setEnd: (d: Date) => void;
 }) => {
 	const previous = () => {
-		const end = props.dashboard.getEnd() ?? timestamp(Date.now());
+		const end = fromDate(props.end());
 		const { from: start } = timeRangeFor(props.preset(), end);
 		props.setEnd(new Date(start));
 	};
 
 	const next = () => {
-		const end = props.dashboard.getEnd() ?? timestamp(Date.now());
+		const end = fromDate(props.end());
 		const newEnd = timestamp(end + presetMs(props.preset()));
 		props.setEnd(new Date(newEnd));
 	};

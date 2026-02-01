@@ -1,143 +1,97 @@
-import type { GlucoseValue } from "@application/Dashboard";
-import type { GlucosStore } from "@domain/GlucoseStore";
-import type { GlucoseSyncStore } from "@domain/GlucoseSyncStore";
-import type { Stream } from "@domain/Stream";
-
-import { type TimeRange, timestamp } from "@domain/TimeRange";
-import type { TransactionRangeStore } from "@domain/TransactionRangeStore";
-import { SQLocal, type Transaction } from "sqlocal";
+import type { LocalStore } from "@domain/GlucoseStore";
+import type { GlucoseValue } from "@domain/GlucoseValue";
+import { type TimeRange, type Timestamp, timestamp } from "@domain/TimeRange";
+import { SQLocal } from "sqlocal";
 import { computeMissingRanges, mergeRanges } from "./ranges";
 
-export class SQLStore implements GlucosStore, GlucoseSyncStore {
-	private db: SQLocal;
-	private tx?: { sql: Transaction["sql"] };
+export class SQLite implements LocalStore {
+	private listeners = new Set<() => void>();
 
-	constructor(
-		db: SQLocal,
-		tx?: {
-			sql: Transaction["sql"];
-		},
-	) {
-		this.db = db;
-		this.tx = tx;
+	private constructor(
+		private db: SQLocal,
+		private readonly maxGap: Timestamp,
+	) {}
+
+	async addMeasurements(measurements: GlucoseValue[]): Promise<void> {
+		const params = measurements.map(() => "(?, ?)").join(", ");
+		const query = `INSERT INTO glucose_values (value, timestamp) VALUES ${params} ON CONFLICT (timestamp) DO NOTHING`;
+		const rows = measurements.flatMap(({ timestamp, glucose }) => [
+			glucose,
+			timestamp,
+		]);
+		await this.db.sql(query, ...rows);
+		this.notify();
 	}
 
-	async runInTx<T>(fn: (r: TransactionRangeStore) => Promise<T>): Promise<T> {
-		const data = await this.db.transaction(async (tx) => {
-			const repo = new SQLStore(this.db, tx);
-			const result = await fn(repo);
-			return result;
-		});
-
-		return data;
-	}
-
-	private get sql() {
-		return this.tx?.sql ?? this.db.sql;
-	}
-
-	async insertItems(items: readonly GlucoseValue[]) {
-		const query = "INSERT INTO glucose_values (timestamp, value) VALUES ";
-		const toInsert = items.map(() => "(?, ?)").join(", ");
-		const params = items.flatMap((item) => [item.timestamp, item.glucose]);
-
-		await this.sql(query.concat(toInsert), ...params);
-	}
-
-	async markRangeComplete(range: TimeRange): Promise<void> {
-		const overlaps = await this
-			.sql`SELECT * FROM completed_ranges WHERE start <= ${range.to} AND end >= ${range.from}`;
-
-		const overlapsRanges = overlaps.map((r) => {
-			return {
-				from: timestamp(r.start),
-				to: timestamp(r.end),
-			};
-		});
-
-		let finalRange = range;
-		if (overlapsRanges.length > 0) {
-			const mergedRange = mergeRanges(overlapsRanges);
-			if (!mergedRange.ok) {
-				throw mergedRange.error;
-			}
-
-			finalRange = mergedRange.value;
-
-			const placeholders = overlaps.map(() => "?").join(",");
-			const overlapIds = overlaps.map((r) => r.id);
-			const query = `DELETE FROM completed_ranges WHERE id IN (${placeholders})`;
-			await this.sql(query, ...overlapIds);
-		}
-
-		await this
-			.sql`INSERT INTO completed_ranges (start, end) VALUES (${finalRange.from}, ${finalRange.to})`;
-	}
-
-	async getMissingRanges(requested: TimeRange): Promise<TimeRange[]> {
-		const completedRows = await this
-			.sql`SELECT start, end  FROM completed_ranges WHERE start <= ${requested.to} AND end >= ${requested.from} ORDER BY start ASC`;
-		const completed = completedRows.map((r) => ({
+	async getKnownRanges(): Promise<TimeRange[]> {
+		const rows = await this.db
+			.sql`SELECT start, end from known_ranges ORDER BY start ASC`;
+		return rows.map((r) => ({
 			from: timestamp(r.start),
 			to: timestamp(r.end),
 		}));
-
-		return computeMissingRanges(requested, completed);
 	}
 
-	// biome-ignore lint/suspicious/noExplicitAny: any type from SQL
-	private mapRow(r: Record<string, any>) {
-		return {
-			timestamp: timestamp(r.timestamp),
-			glucose: r.value,
-		};
-	}
+	async addRanges(ranges: TimeRange[]): Promise<void> {
+		await this.ensureCorrectGap();
 
-	async load(range: TimeRange): Promise<GlucoseValue[]> {
-		const rows = await this.sql`SELECT timestamp,value FROM glucose_values 
-      WHERE timestamp >= ${range.from} AND timestamp <= ${range.to}
-      ORDER BY timestamp ASC, id ASC`;
-		return rows.map(this.mapRow);
-	}
-
-	watch(range: TimeRange): Stream<GlucoseValue[]> {
-		const { reactiveQuery } = this.db;
-		const steam = reactiveQuery(
-			(sql) => sql`SELECT timestamp, value FROM glucose_values 
-      WHERE timestamp >= ${range.from} AND timestamp <= ${range.to}
-      ORDER BY timestamp ASC, id ASC`,
+		const query = ranges.map(() => "(?, ?)").join(", ");
+		const params = ranges.flatMap((range) => [range.from, range.to]);
+		await this.db.sql(
+			"INSERT INTO known_ranges (start, end) VALUES ".concat(query),
+			...params,
 		);
 
-		return {
-			subscribe: (cb: (values: GlucoseValue[]) => void) => {
-				const { unsubscribe } = steam.subscribe((rows) => {
-					cb(rows.map(this.mapRow));
-				});
-
-				return unsubscribe;
-			},
-		};
-	}
-}
-
-export class SQLite {
-	private db: SQLocal;
-	private constructor(db: SQLocal) {
-		this.db = db;
+		this.notify();
 	}
 
-	static async create(filename: string) {
+	private async ensureCorrectGap() {
+		const row = await this.db
+			.sql`SELECT value FROM config WHERE key = ${"max_gap"}`;
+		const previousGap = row[0]?.value;
+		if (previousGap !== undefined && previousGap !== this.maxGap) {
+			await this.db.sql`DELETE FROM known_ranges`;
+		}
+
+		await this.db
+			.sql`INSERT INTO config (key, value) VALUES (${"max_gap"}, ${this.maxGap})
+		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`;
+	}
+
+	async loadMeasurements(range: TimeRange): Promise<GlucoseValue[]> {
+		const rows = await this.db
+			.sql`SELECT * from glucose_values WHERE timestamp >= ${range.from} AND timestamp <= ${range.to} ORDER BY timestamp ASC`;
+
+		const results: GlucoseValue[] = [];
+		for (const row of rows) {
+			results.push({ timestamp: row.timestamp, glucose: row.value });
+		}
+
+		return results;
+	}
+
+	subscribe(fn: () => void): () => void {
+		this.listeners.add(fn);
+		return () => this.listeners.delete(fn);
+	}
+
+	static async create(
+		filename: string,
+		maxGap: Timestamp = timestamp(15 * 60 * 100),
+	) {
 		const db = await Promise.race([
 			new Promise<SQLocal>((resolve) => {
 				const db = new SQLocal({
 					databasePath: filename,
 					onInit(sql) {
 						return [
-							sql`CREATE TABLE IF NOT EXISTS glucose_values (id INTEGER PRIMARY KEY, value INTEGER NOT NULL, timestamp INTEGER NOT NULL)`,
+							sql`CREATE TABLE IF NOT EXISTS glucose_values (id INTEGER PRIMARY KEY, value INTEGER NOT NULL, timestamp INTEGER NOT NULL UNIQUE)`,
 							sql`CREATE INDEX IF NOT EXISTS idx_glucose_timestamp ON glucose_values (timestamp)`,
 
-							sql`CREATE TABLE IF NOT EXISTS completed_ranges (id INTEGER PRIMARY KEY, start INTEGER NOT NULL, end INTEGER NOT NULL)`,
-							sql`CREATE INDEX IF NOT EXISTS idx_completed_ranges_start_end ON completed_ranges (start, end)`,
+							sql`CREATE TABLE IF NOT EXISTS known_ranges (id INTEGER PRIMARY KEY, start INTEGER NOT NULL, end INTEGER NOT NULL)`,
+							sql`CREATE INDEX IF NOT EXISTS idx_known_ranges_start_end ON known_ranges (start, end)`,
+
+							sql`CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value)`,
 						];
 					},
 					reactive: true,
@@ -152,7 +106,19 @@ export class SQLite {
 			}),
 		]);
 
-		return new SQLite(db);
+		return new SQLite(db, maxGap);
+	}
+
+	private notify() {
+		this.listeners.forEach((l) => {
+			l();
+		});
+	}
+
+	async getPreviousGap(): Promise<Timestamp> {
+		const [row] = await this.db
+			.sql`SELECT * FROM config WHERE key = ${"max_gap"}`;
+		return timestamp(row.value);
 	}
 
 	database() {
@@ -160,7 +126,7 @@ export class SQLite {
 	}
 }
 
-export class InMemoryStore implements GlucosStore, GlucoseSyncStore {
+export class InMemoryStore implements LocalStore {
 	private withRandom: boolean;
 	private data: GlucoseValue[];
 
@@ -173,6 +139,17 @@ export class InMemoryStore implements GlucosStore, GlucoseSyncStore {
 	}) {
 		this.withRandom = !!withRandom;
 		this.data = data ? data : [];
+	}
+	async addMeasurements(measurements: GlucoseValue[]): Promise<void> {
+		this.data.push(...measurements);
+	}
+
+	async getKnownRanges(): Promise<TimeRange[]> {
+		return [];
+	}
+
+	async addRanges(ranges: TimeRange[]): Promise<void> {
+		throw new Error("Method not implemented.");
 	}
 
 	private fillRandomValues(range: TimeRange) {
@@ -213,31 +190,5 @@ export class InMemoryStore implements GlucosStore, GlucoseSyncStore {
 		return this.data.filter(
 			(v) => v.timestamp >= range.from && v.timestamp <= range.to,
 		);
-	}
-
-	watch(range: TimeRange): Stream<GlucoseValue[]> {
-		this.fillRandomValues(range);
-
-		return {
-			subscribe: (cb) => {
-				cb(
-					this.data.filter(
-						(v) => v.timestamp >= range.from && v.timestamp <= range.to,
-					),
-				);
-
-				return () => {};
-			},
-		};
-	}
-
-	async insertItems(items: readonly GlucoseValue[]) {
-		this.data.push(...items);
-	}
-
-	async markRangeComplete(_range: TimeRange): Promise<void> {}
-
-	async getMissingRanges(requested: TimeRange): Promise<TimeRange[]> {
-		return [requested];
 	}
 }

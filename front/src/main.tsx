@@ -3,15 +3,17 @@ import "solid-devtools";
 import "virtual:uno.css";
 import "@unocss/reset/eric-meyer.css";
 
-import { AppRuntime } from "@application/AppRuntime";
-import { SyncCoordinator } from "@application/SyncCoordinator";
-import { SyncRange } from "@domain/SyncRange";
-import { SqlTransactionRangeRunner } from "@infra/SqlTransactionRangeRunner";
-import { DefaultClient, HttpSyncSource } from "@infra/SyncSource";
-import { Dashboard } from "./application/Dashboard";
-import { SQLite, SQLStore } from "./infrastructure/GlucoseStore";
+import { GlucoseSyncer } from "@application/GlucoseSyncer";
+import type { GlucoseValue } from "@domain/GlucoseValue";
+import {
+	inferCoveredRanges,
+	type TimeRange,
+	timestamp,
+} from "@domain/TimeRange";
+import { DefaultClient, HttpDataSource } from "@infra/DataSource";
+import { GlucoseSyncerContext } from "@ui/syncerContext";
+import { SQLite } from "./infrastructure/GlucoseStore";
 import { App } from "./ui/App";
-import { DashboardContext } from "./ui/DashboardContext";
 
 const root = document.getElementById("root");
 
@@ -27,28 +29,29 @@ const boostrap = async () => {
 		dbName = ":memory:";
 	}
 
-	const sqlLocal = await SQLite.create(dbName);
-	const sql = new SQLStore(sqlLocal.database());
-	const store = sql;
-	const txStore = new SqlTransactionRangeRunner(sql);
+	const maxGap = timestamp(15 * 60 * 1000);
+	const sqlLocal = await SQLite.create(dbName, maxGap);
+	const inferCoveredRange15min = (values: GlucoseValue[], range: TimeRange) => {
+		return inferCoveredRanges(values, range, maxGap);
+	};
 
-	const source = new HttpSyncSource(
-		new DefaultClient(),
+	const source = new HttpDataSource(
 		"http://localhost:4500",
+		new DefaultClient(),
 	);
-	const coordinator = new SyncCoordinator(
-		new SyncRange(store, txStore, source),
+
+	const glucoseSyncer = new GlucoseSyncer(
+		sqlLocal,
+		source,
+		inferCoveredRange15min,
 	);
-	const dashboard = new Dashboard(store);
-	const runtime = new AppRuntime(dashboard, coordinator);
-	runtime.start();
 
 	if (root) {
 		render(
 			() => (
-				<DashboardContext.Provider value={dashboard}>
+				<GlucoseSyncerContext.Provider value={glucoseSyncer}>
 					<App />
-				</DashboardContext.Provider>
+				</GlucoseSyncerContext.Provider>
 			),
 			root,
 		);

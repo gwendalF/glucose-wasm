@@ -1,4 +1,4 @@
-import type { GlucoseValue } from "@application/Dashboard";
+import type { GlucoseValue } from "@domain/GlucoseValue";
 import type { LineSeriesOption } from "echarts/charts";
 import type {
 	DatasetComponentOption,
