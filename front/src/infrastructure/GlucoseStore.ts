@@ -2,7 +2,6 @@ import type { LocalStore } from "@domain/GlucoseStore";
 import type { GlucoseValue } from "@domain/GlucoseValue";
 import { type TimeRange, type Timestamp, timestamp } from "@domain/TimeRange";
 import { SQLocal } from "sqlocal";
-import { computeMissingRanges, mergeRanges } from "./ranges";
 
 export class SQLite implements LocalStore {
 	private listeners = new Set<() => void>();
@@ -35,6 +34,7 @@ export class SQLite implements LocalStore {
 	async addRanges(ranges: TimeRange[]): Promise<void> {
 		await this.ensureCorrectGap();
 
+		this.db.sql`DELETE FROM known_ranges`;
 		const query = ranges.map(() => "(?, ?)").join(", ");
 		const params = ranges.flatMap((range) => [range.from, range.to]);
 		await this.db.sql(
@@ -115,80 +115,74 @@ export class SQLite implements LocalStore {
 		});
 	}
 
-	async getPreviousGap(): Promise<Timestamp> {
-		const [row] = await this.db
-			.sql`SELECT * FROM config WHERE key = ${"max_gap"}`;
-		return timestamp(row.value);
-	}
-
 	database() {
 		return this.db;
 	}
 }
 
-export class InMemoryStore implements LocalStore {
-	private withRandom: boolean;
-	private data: GlucoseValue[];
+// export class InMemoryStore implements LocalStore {
+//   private withRandom: boolean;
+//   private data: GlucoseValue[];
 
-	constructor({
-		withRandom = false,
-		data,
-	}: {
-		withRandom?: boolean;
-		data?: GlucoseValue[];
-	}) {
-		this.withRandom = !!withRandom;
-		this.data = data ? data : [];
-	}
-	async addMeasurements(measurements: GlucoseValue[]): Promise<void> {
-		this.data.push(...measurements);
-	}
+//   constructor({
+//     withRandom = false,
+//     data,
+//   }: {
+//     withRandom?: boolean;
+//     data?: GlucoseValue[];
+//   }) {
+//     this.withRandom = !!withRandom;
+//     this.data = data ? data : [];
+//   }
+//   async addMeasurements(measurements: GlucoseValue[]): Promise<void> {
+//     this.data.push(...measurements);
+//   }
 
-	async getKnownRanges(): Promise<TimeRange[]> {
-		return [];
-	}
+//   async getKnownRanges(): Promise<TimeRange[]> {
+//     return [];
+//   }
 
-	async addRanges(ranges: TimeRange[]): Promise<void> {
-		throw new Error("Method not implemented.");
-	}
+//   async addRanges(ranges: TimeRange[]): Promise<void> {
+//     throw new Error("Method not implemented.");
+//   }
 
-	private fillRandomValues(range: TimeRange) {
-		const numPts = 150;
-		const step = Math.round((range.to - range.from) / numPts);
-		const data = Array.from({ length: numPts }, (_, i) => ({
-			glucose: Math.floor(Math.random() * (180 - 70) + 70),
-			timestamp: timestamp(range.from + i * step),
-		}));
-		if (this.data.length === 0) {
-			this.data = data;
-			return;
-		}
+//   private fillRandomValues(range: TimeRange) {
+//     const numPts = 150;
+//     const step = Math.round((range.to - range.from) / numPts);
+//     const data = Array.from({ length: numPts }, (_, i) => ({
+//       glucose: Math.floor(Math.random() * (180 - 70) + 70),
+//       timestamp: timestamp(range.from + i * step),
+//     }));
+//     if (this.data.length === 0) {
+//       this.data = data;
+//       return;
+//     }
 
-		const isAfter = range.from >= this.data[this.data.length - 1].timestamp;
-		const isBefore = range.to <= this.data[0].timestamp;
-		if (isAfter) {
-			this.data.push(...data);
-		}
+//     const isAfter = range.from >= this.data[this.data.length - 1].timestamp;
+//     const isBefore = range.to <= this.data[0].timestamp;
+//     if (isAfter) {
+//       this.data.push(...data);
+//     }
 
-		if (isBefore) {
-			data.push(...this.data);
-			this.data = data;
-		}
-	}
+//     if (isBefore) {
+//       data.push(...this.data);
+//       this.data = data;
+//     }
+//   }
 
-	async load(range: TimeRange): Promise<GlucoseValue[]> {
-		if (this.withRandom && this.data.length) {
-			const first = this.data[0].timestamp;
-			const last = this.data[this.data.length - 1].timestamp;
-			if (range.to <= first || range.from >= last) {
-				this.fillRandomValues(range);
-			}
-		} else if (this.withRandom) {
-			this.fillRandomValues(range);
-		}
+//   async load(range: TimeRange): Promise<GlucoseValue[]> {
+//     if (this.withRandom && this.data.length) {
+//       const first = this.data[0].timestamp;
+//       const last = this.data[this.data.length - 1].timestamp;
+//       if (range.to <= first || range.from >= last) {
+//         this.fillRandomValues(range);
+//       }
+//     } else if (this.withRandom) {
+//       this.fillRandomValues(range);
+//     }
 
-		return this.data.filter(
-			(v) => v.timestamp >= range.from && v.timestamp <= range.to,
-		);
-	}
-}
+//     return this.data.filter(
+//       (v) => v.timestamp >= range.from && v.timestamp <= range.to,
+//     );
+//   }
+// }

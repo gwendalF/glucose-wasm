@@ -7,7 +7,6 @@ import {
 } from "solid-js";
 import Left from "~icons/ant-design/arrow-left-outlined";
 import Right from "~icons/ant-design/arrow-right-outlined";
-
 import {
 	fromDate,
 	presetMs,
@@ -16,7 +15,6 @@ import {
 	timeRangeFor,
 	timestamp,
 } from "../domain/TimeRange";
-
 import { Graph } from "./Graph";
 import { useSyncer } from "./syncerContext";
 
@@ -25,13 +23,15 @@ export const App = () => {
 	const [end, setEnd] = createSignal(new Date("2026-01-1"));
 	const [preset, _] = createSignal<TimePreset>(TimePresets.Last24Hours);
 	const range = () => timeRangeFor(preset(), fromDate(end()));
-
-	const [data, { refetch }] = createResource(range, (r) => {
-		return syncer.getMeasurements(r);
-	});
+	const [data, { mutate }] = createResource(range, (r) =>
+		syncer.getMeasurements(r),
+	);
 
 	onMount(() => {
-		const unsub = syncer.onChange(() => refetch());
+		const unsub = syncer.onChange(async () => {
+			const udapted = await syncer.getMeasurements(range());
+			mutate(udapted);
+		});
 		onCleanup(unsub);
 	});
 

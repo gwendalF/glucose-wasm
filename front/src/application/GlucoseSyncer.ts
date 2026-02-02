@@ -1,6 +1,7 @@
+import type { GapManager } from "@domain/GapManager";
 import type { LocalStore } from "@domain/GlucoseStore";
-import type { GlucoseValue } from "@domain/GlucoseValue";
-import { RangeSet, type TimeRange } from "@domain/TimeRange";
+import type { RangeSet } from "@domain/RangeSet";
+import type { TimeRange } from "@domain/TimeRange";
 import type { DataSource } from "./DataSource";
 
 export class GlucoseSyncer {
@@ -9,19 +10,30 @@ export class GlucoseSyncer {
 	constructor(
 		private store: LocalStore,
 		private source: DataSource,
-		private readonly inferCoveredRanges: (
-			values: GlucoseValue[],
-			range: TimeRange,
-		) => TimeRange[],
+		private gapManager: GapManager,
+		private makeRangeSet: (knownRanges: TimeRange[]) => RangeSet,
 	) {}
 
-	async fetchMissing(requested: TimeRange) {
-		const knowns = await this.store.getKnownRanges();
-		const set = new RangeSet(knowns);
-		const missings = set.resolveMissingRanges(requested);
+	private key(range: TimeRange) {
+		return `${range.from}-${range.to}`;
+	}
 
-		for (const missing of missings) {
-			await this.syncSingleRange(missing);
+	async fetchMissing(requested: TimeRange) {
+		const key = this.key(requested);
+		if (this.inFlights.has(key)) {
+			return;
+		}
+		this.inFlights.add(key);
+
+		try {
+			const knowns = await this.store.getKnownRanges();
+			const set = this.makeRangeSet(knowns);
+			const missings = set.resolveMissingRanges(requested);
+			for (const missing of missings) {
+				await this.fetchAndStore(missing);
+			}
+		} finally {
+			this.inFlights.delete(key);
 		}
 	}
 
@@ -33,39 +45,36 @@ export class GlucoseSyncer {
 		return this.store.loadMeasurements(range);
 	}
 
-	private async syncSingleRange(range: TimeRange) {
-		let from = range.from;
+	private async fetchAndStore(range: TimeRange): Promise<void> {
+		let currentFrom = range.from;
+
 		while (true) {
-			const currentRange = { from, to: range.to };
-			const key = this.key(currentRange);
-			if (this.inFlights.has(key)) break;
-			this.inFlights.add(key);
-			const result = await this.fetchAndStore(currentRange);
-			this.inFlights.delete(key);
-			const { hasMore, lastTimestamp } = result;
-			if (!hasMore || !lastTimestamp) break;
+			const { values, hasMore } = await this.source.fetchMeasurements({
+				from: currentFrom,
+				to: range.to,
+			});
 
-			from = lastTimestamp;
+			if (values.length > 0) {
+				await this.store.addMeasurements(values);
+			}
+
+			const { coveredRanges, nextCursor } = this.gapManager.computeCoveredRange(
+				values,
+				{ from: currentFrom, to: range.to },
+				hasMore,
+			);
+			const allRanges = await this.store.getKnownRanges();
+			const set = this.makeRangeSet(allRanges);
+			const rangesToInsert = set.consolidate(coveredRanges);
+			if (rangesToInsert.length > 0) {
+				await this.store.addRanges(rangesToInsert);
+			}
+
+			if (nextCursor && nextCursor < range.to) {
+				currentFrom = nextCursor;
+			} else {
+				break;
+			}
 		}
-	}
-
-	private key(range: TimeRange): string {
-		return `${range.from}-${range.to}`;
-	}
-
-	private async fetchAndStore(range: TimeRange) {
-		const { values, hasMore } = await this.source.fetchMeasurements(range);
-		if (values.length === 0) return { hasMore: false };
-
-		await this.store.addMeasurements(values);
-		const covered = this.inferCoveredRanges(values, range);
-		if (covered.length > 0) {
-			await this.store.addRanges(covered);
-		}
-
-		return {
-			hasMore,
-			lastTimestamp: values[values.length - 1].timestamp,
-		};
 	}
 }

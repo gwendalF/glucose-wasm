@@ -12,11 +12,28 @@ interface HttpClient {
 	get<T>(url: string): Promise<T>;
 }
 
-export class DefaultClient {
+export class DefaultClient implements HttpClient {
 	async get<T>(url: string): Promise<T> {
 		const response = await fetch(url);
 		const json = await response.json();
 		return json;
+	}
+}
+
+export class ThrottledClient implements HttpClient {
+	private inFlight: (() => Promise<void>) | undefined;
+
+	constructor(
+		private delayMs: number,
+		private client: HttpClient,
+	) {}
+
+	async get<T>(url: string): Promise<T> {
+		if (this.inFlight) {
+			await this.inFlight();
+		}
+		await new Promise((r) => setTimeout(r, this.delayMs));
+		return this.client.get(url);
 	}
 }
 

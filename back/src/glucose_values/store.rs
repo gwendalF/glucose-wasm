@@ -93,7 +93,7 @@ impl GlucoseStore for Store {
 
         let to_idx = std::cmp::min(target_to_idx, from_idx + limit);
 
-        let is_before_end = target_to_idx < data.timestamps.len();
+        let is_before_end = to_idx < data.timestamps.len();
         let has_more = is_before_end && (to_idx == from_idx + limit);
 
         let timestamps = &data.timestamps[from_idx..to_idx];
