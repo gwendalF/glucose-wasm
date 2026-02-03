@@ -3,6 +3,7 @@ use salvo::{Listener, Server};
 
 use crate::glucose_values::store::Store;
 
+mod errors;
 mod router;
 
 pub fn run() -> Result<(), std::io::Error> {

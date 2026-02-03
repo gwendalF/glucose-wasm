@@ -10,3 +10,4 @@ salvo = { version = "0.89.0", features = ["oapi", "affix-state", "cors"] }
 serde = { version = "1.0.228", features = ["derive"] }
 chrono = "0.4.43"
 arc-swap = "1.8.0"
+thiserror = "2.0.18"
