@@ -1,70 +1,76 @@
 import {
-	maxTimestamp,
-	minTimestamp,
-	type TimeRange,
-	type Timestamp,
-	timestamp,
+  maxTimestamp,
+  minTimestamp,
+  type TimeRange,
+  type Timestamp,
+  timestamp,
 } from "./TimeRange";
 
-export class RangeSet {
-	private knownRanges: TimeRange[];
+export type RangeSetComputer = {
+  resolveMissingRanges(requested: TimeRange): TimeRange[];
+  consolidate(toAdd: TimeRange[]): TimeRange[];
+};
 
-	constructor(
-		knownRanges: readonly TimeRange[],
-		private maxGap: Timestamp,
-	) {
-		this.knownRanges = [...knownRanges];
-	}
+export class RangeSet implements RangeSetComputer {
+  private knownRanges: TimeRange[];
 
-	resolveMissingRanges(requested: TimeRange): TimeRange[] {
-		const result: TimeRange[] = [];
-		let cursor = requested.from;
-		for (const known of this.knownRanges) {
-			const from = maxTimestamp(known.from, requested.from);
-			const to = minTimestamp(known.to, requested.to);
+  constructor(
+    knownRanges: readonly TimeRange[],
+    private maxGap: Timestamp,
+  ) {
+    this.knownRanges = [...knownRanges];
+  }
 
-			if (from > cursor + this.maxGap) {
-				result.push({ from: cursor, to: from });
-			}
+  resolveMissingRanges(requested: TimeRange): TimeRange[] {
+    const result: TimeRange[] = [];
+    let cursor = requested.from;
+    for (const known of this.knownRanges) {
+      const from = maxTimestamp(known.from, requested.from);
+      const to = minTimestamp(known.to, requested.to);
 
-			cursor = maxTimestamp(cursor, to);
-		}
+      if (from > cursor + this.maxGap) {
+        result.push({ from: cursor, to: from });
+      }
 
-		if (cursor + this.maxGap < requested.to) {
-			result.push({ from: cursor, to: requested.to });
-		}
+      cursor = maxTimestamp(cursor, to);
+    }
 
-		return result;
-	}
+    if (cursor + this.maxGap < requested.to) {
+      result.push({ from: cursor, to: requested.to });
+    }
 
-	consolidate(toAdd: TimeRange[]): TimeRange[] {
-		for (const range of toAdd) {
-			const idx = this.knownRanges.findIndex((r) => r.from > range.from);
-			if (idx === -1) {
-				this.knownRanges.push(range);
-				continue;
-			}
-			this.knownRanges.splice(idx, 0, range);
-		}
+    return result;
+  }
 
-		if (this.knownRanges.length === 0) return [];
+  consolidate(toAdd: TimeRange[]): TimeRange[] {
+    for (const range of toAdd) {
+      //stryker: > and >= give the same output after merge
+      const idx = this.knownRanges.findIndex((r) => r.from > range.from);
+      if (idx === -1) {
+        this.knownRanges.push(range);
+        continue;
+      }
+      this.knownRanges.splice(idx, 0, range);
+    }
 
-		const merged: TimeRange[] = [];
-		let current = this.knownRanges[0];
-		for (let i = 1; i < this.knownRanges.length; i++) {
-			const next = this.knownRanges[i];
-			if (next.from <= timestamp(current.to + this.maxGap)) {
-				current = {
-					from: current.from,
-					to: maxTimestamp(current.to, next.to),
-				};
-			} else {
-				merged.push(current);
-				current = next;
-			}
-		}
-		merged.push(current);
-		this.knownRanges = merged;
-		return this.knownRanges;
-	}
+    if (this.knownRanges.length === 0) return [];
+
+    const merged: TimeRange[] = [];
+    let current = this.knownRanges[0];
+    for (let i = 1; i < this.knownRanges.length; i++) {
+      const next = this.knownRanges[i];
+      if (next.from <= timestamp(current.to + this.maxGap)) {
+        current = {
+          from: current.from,
+          to: maxTimestamp(current.to, next.to),
+        };
+      } else {
+        merged.push(current);
+        current = next;
+      }
+    }
+    merged.push(current);
+    this.knownRanges = merged;
+    return this.knownRanges;
+  }
 }
