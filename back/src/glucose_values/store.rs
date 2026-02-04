@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use rusqlite::Result;
 use serde::Serialize;
+use thiserror::Error;
 
 #[derive(Serialize)]
 pub struct Measurements<'a> {
@@ -14,14 +15,22 @@ struct OwnedData {
     values: Vec<u16>,
 }
 
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("IO error")]
+    Io(#[from] rusqlite::Error),
+    #[error("data is missing: {0}")]
+    Missing(String),
+}
+
 pub trait GlucoseStore {
     fn load(
         &self,
         from: DateTime<Utc>,
         to: DateTime<Utc>,
         limit: usize,
-    ) -> std::result::Result<Measurements<'_>, String>;
-    fn insert(&self, values: &Measurements) -> Result<(), String>;
+    ) -> std::result::Result<Measurements<'_>, Error>;
+    fn insert(&self, values: &Measurements) -> Result<(), Error>;
 }
 
 static DATA: std::sync::OnceLock<OwnedData> = std::sync::OnceLock::new();
@@ -78,11 +87,13 @@ impl GlucoseStore for Store {
         from: DateTime<Utc>,
         to: DateTime<Utc>,
         limit: usize,
-    ) -> std::result::Result<Measurements<'_>, String> {
+    ) -> std::result::Result<Measurements<'_>, Error> {
         let from = from.timestamp_millis();
         let to = to.timestamp_millis();
 
-        let data = DATA.get().unwrap();
+        let data = DATA
+            .get()
+            .ok_or_else(|| Error::Missing(String::from("DATA static")))?;
 
         let from_idx = data
             .timestamps
@@ -106,7 +117,7 @@ impl GlucoseStore for Store {
         })
     }
 
-    fn insert(&self, _values: &Measurements) -> Result<(), String> {
+    fn insert(&self, _values: &Measurements) -> Result<(), Error> {
         todo!()
     }
 }

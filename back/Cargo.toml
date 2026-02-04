@@ -6,8 +6,15 @@ edition = "2024"
 [dependencies]
 tokio = { version = "1.49.0" }
 rusqlite = { version = "0.38.0", features = ["bundled"] }
-salvo = { version = "0.89.0", features = ["oapi", "affix-state", "cors"] }
+salvo = { version = "0.89.1", features = [
+    "oapi",
+    "affix-state",
+    "cors",
+    "serve-static",
+    "acme",
+] }
 serde = { version = "1.0.228", features = ["derive"] }
 chrono = "0.4.43"
-arc-swap = "1.8.0"
+arc-swap = "1.8.1"
 thiserror = "2.0.18"
+dotenvy = "0.15.7"
