@@ -1,7 +1,10 @@
-import { defineConfig, presetMini } from "unocss";
+import { defineConfig, presetWind4 } from "unocss";
+import { presetAnimations } from "unocss-preset-animations";
+import { presetShadcn } from "unocss-preset-shadcn";
 
 export default defineConfig({
-	presets: [presetMini()],
+	// biome-ignore lint/suspicious/noExplicitAny: Theme preset typescript
+	presets: [presetWind4(), presetAnimations() as any, presetShadcn()],
 	preflights: [
 		{
 			getCSS: () => `
