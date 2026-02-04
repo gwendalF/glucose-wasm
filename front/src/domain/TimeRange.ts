@@ -22,6 +22,7 @@ export function fromDate(date: Date): Timestamp {
 }
 
 export const TimePresets = {
+	Last3Hours: "Last3Hours",
 	Last6Hours: "Last6Hours",
 	Last12Hours: "Last12Hours",
 	Last24Hours: "Last24Hours",
@@ -35,6 +36,9 @@ export type TimePreset = (typeof TimePresets)[keyof typeof TimePresets];
 export const presetMs = (preset: TimePreset): number => {
 	let durationMs: number;
 	switch (preset) {
+		case "Last3Hours":
+			durationMs = 3 * HOURS;
+			break;
 		case "Last6Hours":
 			durationMs = 6 * HOURS;
 			break;
