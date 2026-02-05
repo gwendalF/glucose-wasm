@@ -1,5 +1,4 @@
-import { parseDate } from "@ark-ui/solid";
-
+import type { DatePickerRootProps } from "@ark-ui/solid";
 import { Index } from "solid-js";
 import { Portal } from "solid-js/web";
 import {
@@ -25,35 +24,31 @@ import {
 	DatePickerViewTrigger,
 } from "./components/date-picker";
 
-type DatePickerProps = {
-	value: () => Date;
-	onChange: (d: Date) => void;
-};
+interface CustomProps {
+	placeholder?: string;
+	readOnly?: boolean;
+}
 
-function DatePickerDemo(props: DatePickerProps) {
+type CombinedDatePickerProps = DatePickerRootProps & CustomProps;
+
+function DatePickerDemo(props: CombinedDatePickerProps) {
 	return (
-		<DatePicker
-			startOfWeek={1}
-			value={[parseDate(props.value())]}
-			onValueChange={(change) => {
-				const changedDate = change.value[0];
-				if (changedDate) {
-					props.onChange(
-						new Date(changedDate.year, changedDate.month - 1, changedDate.day),
-					);
-				}
-			}}
-			format={(e) => {
-				return `${e.day.toFixed()}/${e.month}/${e.year}`;
-			}}
-			locale="fr-FR"
-		>
+		<DatePicker startOfWeek={1} {...props}>
 			<DatePickerControl>
 				<DatePickerInput
-					placeholder="Selectionner la date"
+					placeholder={props.placeholder}
 					fixOnBlur={false}
-					readOnly
+					readOnly={!!props.readOnly}
+					index={0}
 				/>
+				{props.selectionMode === "range" && (
+					<DatePickerInput
+						placeholder={props.placeholder}
+						fixOnBlur={false}
+						readOnly={!!props.readOnly}
+						index={1}
+					/>
+				)}
 				<DatePickerTrigger />
 			</DatePickerControl>
 			<Portal>

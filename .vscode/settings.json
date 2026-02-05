@@ -12,5 +12,4 @@
 		"front": true,
 		"back": true
 	},
-	"biome.lsp.bin": "front/node_modules/.bin/biome.ps1"
 }

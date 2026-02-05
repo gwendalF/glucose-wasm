@@ -1,7 +1,9 @@
 use salvo::Router;
 use salvo::affix_state;
+use salvo::cors::AllowOrigin;
 use salvo::cors::Cors;
-use salvo::http::Method;
+
+use salvo::http::{Method, header::HeaderName};
 use salvo::serve_static::StaticDir;
 
 use super::ServerConfig;
@@ -13,19 +15,33 @@ pub trait StoreBound: GlucoseStore + Sync + Send + Clone + 'static {}
 impl<T: GlucoseStore + Sync + Send + Clone + 'static> StoreBound for T {}
 
 pub fn router<T: StoreBound>(config: &ServerConfig, store: T) -> salvo::Router {
-    let cors = Cors::new()
-        .allow_origin(&vec![
-            String::from("http://localhost:5173"),
-            format!("https://{}", config.domain),
-        ])
-        .allow_methods(vec![
-            Method::GET,
-            Method::POST,
-            Method::PUT,
-            Method::OPTIONS,
-        ])
-        .allow_headers(vec!["content-type", "authorization"])
-        .into_handler();
+    let mut cors = Cors::new();
+
+    let allowed_headers = [
+        HeaderName::from_static("content-type"),
+        HeaderName::from_static("authorization"),
+    ];
+    if config.is_prod {
+        cors = cors
+            .allow_origin(&format!("https://{}", config.domain))
+            .allow_methods([Method::GET, Method::POST, Method::PUT, Method::OPTIONS])
+            .allow_headers(allowed_headers);
+    } else {
+        cors = cors
+            .allow_origin(AllowOrigin::dynamic(|origin, _req, _depot| {
+                if let Some(addr) = origin
+                    && addr.as_bytes().starts_with(b"http://localhost")
+                {
+                    return origin.cloned();
+                }
+
+                None
+            }))
+            .allow_methods([Method::GET, Method::POST, Method::PUT, Method::OPTIONS])
+            .allow_headers(allowed_headers);
+    }
+
+    let cors = cors.into_handler();
 
     Router::new()
         .hoop(affix_state::inject(store))

@@ -1,5 +1,5 @@
+import { timestamp } from "@domain/TimeRange";
 import { describe, test } from "vitest";
-import { timestamp } from "../domain/TimeRange";
 import { prepareData } from "./prepareData";
 
 describe("graph", () => {

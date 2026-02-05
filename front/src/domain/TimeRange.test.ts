@@ -10,15 +10,9 @@ describe("timeRangeFor", () => {
 		[TimePresets.Last24Hours, fromDate(new Date("2026-01-01T12:00:00.000Z"))],
 		[TimePresets.LastYear, fromDate(new Date("2025-01-02T12:00:00.000Z"))],
 	] as const)("%s -> %s", ([preset, from], { expect }) => {
+		const range = timeRangeFor(preset, now);
 
-		const range = timeRangeFo
-
-eset, now);
-
-
-
-
-	
-	expect(range.to).toBe(now);
+		expect(range.from).toBe(from);
+		expect(range.to).toBe(now);
 	});
 });

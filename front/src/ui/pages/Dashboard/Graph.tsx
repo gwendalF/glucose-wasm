@@ -1,3 +1,7 @@
+import type { GlucoseValue } from "@domain/GlucoseValue";
+import type { TimePreset } from "@domain/TimeRange";
+import { prepareData } from "@ui/pages/Dashboard/prepareData";
+import { useDimension } from "@ui/useDimension";
 import { LineChart } from "echarts/charts";
 import {
 	DatasetComponent,
@@ -10,10 +14,6 @@ import { type ECharts, init, use } from "echarts/core";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer } from "echarts/renderers";
 import { createEffect, createSignal, onCleanup } from "solid-js";
-import type { GlucoseValue } from "../application/Dashboard";
-import type { TimePreset } from "../domain/TimeRange";
-import { prepareData } from "./prepareData";
-import { useDimension } from "./useDimension";
 
 use([
 	LineChart,
@@ -33,7 +33,7 @@ interface Props {
 	class: () => string;
 }
 
-export const Graph = (props: Props) => {
+export function Graph(props: Props) {
 	const [ref, setRef] = createSignal<HTMLDivElement>();
 	const [size] = useDimension(ref);
 
@@ -60,4 +60,4 @@ export const Graph = (props: Props) => {
 	});
 
 	return <div ref={setRef} class="w-full h-full" />;
-};
+}
