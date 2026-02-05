@@ -1,0 +1,164 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`graph > empty data return empty array 1`] = `
+{
+  "grid": {
+    "bottom": 40,
+    "left": 50,
+    "right": 20,
+    "top": 20,
+  },
+  "series": [
+    {
+      "areaStyle": {
+        "color": LinearGradient {
+          "colorStops": [
+            {
+              "color": "rgba(79, 70, 229, 0.2)",
+              "offset": 0,
+            },
+            {
+              "color": "rgba(79, 70, 229, 0)",
+              "offset": 1,
+            },
+          ],
+          "global": false,
+          "type": "linear",
+          "x": 0,
+          "x2": 0,
+          "y": 0,
+          "y2": 1,
+        },
+      },
+      "data": [],
+      "lineStyle": {
+        "color": "#4f46e5",
+        "width": 4,
+      },
+      "smooth": 0.4,
+      "symbol": "none",
+      "type": "line",
+    },
+  ],
+  "tooltip": {
+    "trigger": "axis",
+  },
+  "xAxis": {
+    "axisLabel": {
+      "formatter": {
+        "day": "{dd}/{MM}",
+        "hour": "{HH}:{mm}",
+        "minute": "{HH}:{mm}",
+        "month": "{MMM}",
+        "year": "{yyyy}",
+      },
+    },
+    "axisLine": {
+      "lineStyle": {
+        "color": "#e2e8f0",
+      },
+    },
+    "splitLine": {
+      "show": false,
+    },
+    "type": "time",
+  },
+  "yAxis": {
+    "max": [Function],
+    "min": 30,
+    "splitLine": {
+      "lineStyle": {
+        "color": "#f1f5f9",
+        "type": "dashed",
+      },
+    },
+    "type": "value",
+  },
+}
+`;
+
+exports[`graph > prepare data for echarts 1`] = `
+{
+  "grid": {
+    "bottom": 40,
+    "left": 50,
+    "right": 20,
+    "top": 20,
+  },
+  "series": [
+    {
+      "areaStyle": {
+        "color": LinearGradient {
+          "colorStops": [
+            {
+              "color": "rgba(79, 70, 229, 0.2)",
+              "offset": 0,
+            },
+            {
+              "color": "rgba(79, 70, 229, 0)",
+              "offset": 1,
+            },
+          ],
+          "global": false,
+          "type": "linear",
+          "x": 0,
+          "x2": 0,
+          "y": 0,
+          "y2": 1,
+        },
+      },
+      "data": [
+        [
+          1234,
+          80,
+        ],
+        [
+          102030,
+          90,
+        ],
+      ],
+      "lineStyle": {
+        "color": "#4f46e5",
+        "width": 4,
+      },
+      "smooth": 0.4,
+      "symbol": "none",
+      "type": "line",
+    },
+  ],
+  "tooltip": {
+    "trigger": "axis",
+  },
+  "xAxis": {
+    "axisLabel": {
+      "formatter": {
+        "day": "{dd}/{MM}",
+        "hour": "{HH}:{mm}",
+        "minute": "{HH}:{mm}",
+        "month": "{MMM}",
+        "year": "{yyyy}",
+      },
+    },
+    "axisLine": {
+      "lineStyle": {
+        "color": "#e2e8f0",
+      },
+    },
+    "splitLine": {
+      "show": false,
+    },
+    "type": "time",
+  },
+  "yAxis": {
+    "max": [Function],
+    "min": 30,
+    "splitLine": {
+      "lineStyle": {
+        "color": "#f1f5f9",
+        "type": "dashed",
+      },
+    },
+    "type": "value",
+  },
+}
+`;

@@ -70,6 +70,13 @@ export class SQLite implements LocalStore {
 		return results;
 	}
 
+	async mean(range: TimeRange): Promise<number> {
+		const [row] = await this.db
+			.sql`SELECT AVG(value) AS mean FROM glucose_values WHERE timestamp >= ${range.from} AND timestamp <= ${range.to}`;
+		console.log({ row, range });
+		return row.mean;
+	}
+
 	subscribe(fn: () => void): () => void {
 		this.listeners.add(fn);
 		return () => this.listeners.delete(fn);

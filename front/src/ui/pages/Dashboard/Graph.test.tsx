@@ -4,30 +4,7 @@ import { prepareData } from "./prepareData";
 
 describe("graph", () => {
 	test("empty data return empty array", ({ expect }) => {
-		expect(prepareData([])).toEqual({
-			tooltip: { trigger: "axis" },
-			xAxis: {
-				type: "time",
-				axisLabel: {
-					formatter: {
-						year: "{yyyy}",
-						month: "{MMM}",
-						day: "{dd}/{MM}",
-						hour: "{HH}:{mm}",
-						minute: "{HH}:{mm}",
-					},
-				},
-			},
-			yAxis: { type: "value" },
-			series: [
-				{
-					name: "Glycémie",
-					type: "line",
-					smooth: true,
-					data: [],
-				},
-			],
-		});
+		expect(prepareData([])).toMatchSnapshot();
 	});
 
 	test("prepare data for echarts", ({ expect }) => {
@@ -36,32 +13,6 @@ describe("graph", () => {
 				{ timestamp: timestamp(1234), glucose: 80 },
 				{ timestamp: timestamp(102030), glucose: 90 },
 			]),
-		).toEqual({
-			tooltip: { trigger: "axis" },
-			xAxis: {
-				type: "time",
-				axisLabel: {
-					formatter: {
-						year: "{yyyy}",
-						month: "{MMM}",
-						day: "{dd}/{MM}",
-						hour: "{HH}:{mm}",
-						minute: "{HH}:{mm}",
-					},
-				},
-			},
-			yAxis: { type: "value" },
-			series: [
-				{
-					name: "Glycémie",
-					type: "line",
-					smooth: true,
-					data: [
-						[1234, 80],
-						[102030, 90],
-					],
-				},
-			],
-		});
+		).toMatchSnapshot();
 	});
 });

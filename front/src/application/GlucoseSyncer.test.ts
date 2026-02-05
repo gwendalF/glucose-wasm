@@ -31,6 +31,9 @@ describe("GlucoseSyncer", ({ beforeEach }) => {
 				return [];
 			},
 			subscribe,
+			async mean() {
+				return 0;
+			},
 		};
 	});
 
@@ -361,6 +364,7 @@ describe("GlucoseSyncer", ({ beforeEach }) => {
 			async addRanges() {},
 			loadMeasurements: vi.fn(),
 			subscribe,
+			mean: vi.fn(),
 		};
 
 		let firstCall = true;

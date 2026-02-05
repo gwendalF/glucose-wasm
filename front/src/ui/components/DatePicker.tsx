@@ -22,11 +22,11 @@ import {
 	DatePickerView,
 	DatePickerViewControl,
 	DatePickerViewTrigger,
-} from "./components/date-picker";
+} from "./ui/date-picker";
 
 interface CustomProps {
 	placeholder?: string;
-	readOnly?: boolean;
+	readOnlyInput?: boolean;
 }
 
 type CombinedDatePickerProps = DatePickerRootProps & CustomProps;
@@ -45,7 +45,7 @@ function DatePickerDemo(props: CombinedDatePickerProps) {
 					<DatePickerInput
 						placeholder={props.placeholder}
 						fixOnBlur={false}
-						readOnly={!!props.readOnly}
+						readOnly={!!props.readOnlyInput}
 						index={1}
 					/>
 				)}

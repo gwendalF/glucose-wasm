@@ -3,6 +3,7 @@ import "solid-devtools";
 import "virtual:uno.css";
 import "@unocss/reset/eric-meyer.css";
 
+import { Analyser } from "@application/Analyser";
 import { GlucoseSyncer } from "@application/GlucoseSyncer";
 import { GapHandler } from "@domain/GapManager";
 import { RangeSet } from "@domain/RangeSet";
@@ -13,6 +14,7 @@ import {
 	HttpDataSource,
 	ThrottledClient,
 } from "@infra/DataSource";
+import { AnalyserContext } from "@ui/analyserContext";
 import { GlucoseSyncerContext } from "@ui/syncerContext";
 import { SQLite } from "./infrastructure/GlucoseStore";
 import { App } from "./ui/App";
@@ -39,8 +41,9 @@ const boostrap = async () => {
 	const httpClient = new DefaultClient();
 	const source = new HttpDataSource(apiUrl, httpClient);
 	const gapManager = new GapHandler(SYNC_POLICY.maxDelayBetweenSamples);
+	const anlyser = new Analyser(sqlLocal);
 
-	const slowClient = new ThrottledClient(300, httpClient);
+	const slowClient = new ThrottledClient(100, httpClient);
 	const slowSyncer = new GlucoseSyncer(
 		sqlLocal,
 		new HttpDataSource(apiUrl, slowClient),
@@ -65,7 +68,9 @@ const boostrap = async () => {
 		render(
 			() => (
 				<GlucoseSyncerContext.Provider value={glucoseSyncer}>
-					<App />
+					<AnalyserContext.Provider value={anlyser}>
+						<App />
+					</AnalyserContext.Provider>
 				</GlucoseSyncerContext.Provider>
 			),
 			root,
