@@ -2,6 +2,7 @@ use crate::server;
 
 mod config;
 mod load_db;
+mod postcard;
 
 pub use config::Config;
 
@@ -27,6 +28,14 @@ pub fn run(args: Vec<String>) -> Result<(), String> {
         "run" => {
             let config = Config::load().map_err(|e| e.to_string())?;
             println!("Server output: {:?}", server::run(&config));
+            Ok(())
+        }
+        "postcard" => {
+            if args.len() <= 2 {
+                return Err(String::from("missing db file"));
+            }
+
+            postcard::save_db_to_postcard(&args[2]).map_err(|e| e.to_string())?;
             Ok(())
         }
         _ => Err(String::from("unknow command")),

@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
-use rusqlite::Result;
-use serde::Serialize;
+
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[derive(Serialize)]
@@ -10,9 +10,9 @@ pub struct Measurements<'a> {
     pub has_more: bool,
 }
 
-struct OwnedData {
-    timestamps: Vec<i64>,
-    values: Vec<u16>,
+pub struct OwnedData {
+    pub timestamps: Vec<i64>,
+    pub values: Vec<u16>,
 }
 
 #[derive(Debug, Error)]
@@ -21,7 +21,11 @@ pub enum Error {
     Io(#[from] rusqlite::Error),
     #[error("data is missing: {0}")]
     Missing(String),
+    #[error("Postcard error {0}")]
+    Postcard(String),
 }
+
+type Result<T> = std::result::Result<T, Error>;
 
 pub trait GlucoseStore {
     fn load(
@@ -29,8 +33,8 @@ pub trait GlucoseStore {
         from: DateTime<Utc>,
         to: DateTime<Utc>,
         limit: usize,
-    ) -> std::result::Result<Measurements<'_>, Error>;
-    fn insert(&self, values: &Measurements) -> Result<(), Error>;
+    ) -> Result<Measurements<'_>>;
+    fn insert(&self, values: &Measurements) -> Result<()>;
 }
 
 static DATA: std::sync::OnceLock<OwnedData> = std::sync::OnceLock::new();
@@ -67,6 +71,53 @@ fn load_sqlite_data(path: &str) -> Result<OwnedData> {
     Ok(measures)
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct PostCardData {
+    pub first_timestamp: i64,
+    pub timestamps: Vec<i64>,
+    pub first_measure: u16,
+    pub measures: Vec<i16>,
+}
+
+fn load_postcard_data(path: &str) -> Result<OwnedData> {
+    let content = std::fs::read(path).map_err(|e| Error::Postcard(e.to_string()))?;
+
+    let raw_postcard =
+        zstd::decode_all(content.as_slice()).map_err(|e| Error::Postcard(e.to_string()))?;
+
+    let postcard: PostCardData =
+        postcard::from_bytes(&raw_postcard).map_err(|e| Error::Postcard(e.to_string()))?;
+
+    let timestamps: Vec<_> =
+        std::iter::once(postcard.first_timestamp)
+            .chain(postcard.timestamps.into_iter().scan(
+                postcard.first_timestamp,
+                |timestamp, dt| {
+                    *timestamp += dt;
+                    Some(*timestamp)
+                },
+            ))
+            .collect();
+
+    let glucoses: Vec<_> = std::iter::once(postcard.first_measure)
+        .chain(
+            postcard
+                .measures
+                .into_iter()
+                .scan(postcard.first_measure, |measure, dy| {
+                    let next = (*measure as i16 + dy) as u16;
+                    *measure = next;
+                    Some(next)
+                }),
+        )
+        .collect();
+
+    Ok(OwnedData {
+        timestamps,
+        values: glucoses,
+    })
+}
+
 #[derive(Clone, Copy)]
 pub struct Store {
     _private: (),
@@ -74,10 +125,18 @@ pub struct Store {
 
 impl Store {
     pub fn new(path: &str) -> Result<Self> {
-        let data = load_sqlite_data(path)?;
-        let _ = DATA.set(data);
-
-        Ok(Store { _private: () })
+        match load_postcard_data(path) {
+            Ok(data) => {
+                let _ = DATA.set(data);
+                Ok(Store { _private: () })
+            }
+            Err(e) => {
+                println!("Erreur loading postcard {e}");
+                let data = load_sqlite_data(path)?;
+                let _ = DATA.set(data);
+                Ok(Store { _private: () })
+            }
+        }
     }
 }
 
@@ -117,7 +176,7 @@ impl GlucoseStore for Store {
         })
     }
 
-    fn insert(&self, _values: &Measurements) -> Result<(), Error> {
+    fn insert(&self, _values: &Measurements) -> Result<()> {
         todo!()
     }
 }
