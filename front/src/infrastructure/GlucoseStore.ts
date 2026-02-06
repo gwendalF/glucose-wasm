@@ -80,13 +80,9 @@ export class SQLite implements LocalStore {
 	}
 
 	async loadMeasurements(range: TimeRange): Promise<GlucoseValue[]> {
-		const id = crypto.randomUUID();
-		console.log("Before load", id);
-		const t = Date.now();
 		const rows: GlucoseValue[] = await this
 			.sql`SELECT timestamp, value AS glucose from glucose_values WHERE timestamp >= ${range.from} AND timestamp <= ${range.to} ORDER BY timestamp ASC`;
 
-		console.log("After load", Date.now() - t, id);
 		return rows;
 	}
 

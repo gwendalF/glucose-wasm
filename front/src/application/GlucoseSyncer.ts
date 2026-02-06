@@ -60,8 +60,6 @@ export class GlucoseSyncer {
 			);
 
 			if (values.length > 0) {
-				console.log("Before tx");
-				const t = Date.now();
 				await this.store.addMeasurements(values, async (store) => {
 					const allRanges = await store.getKnownRanges();
 					const set = this.makeRangeSet(allRanges);
@@ -70,7 +68,6 @@ export class GlucoseSyncer {
 						await store.addRanges(rangesToInsert);
 					}
 				});
-				console.log("After full tx with range", Date.now() - t);
 			}
 
 			if (nextCursor && nextCursor < range.to) {
