@@ -1,29 +1,50 @@
 import type { LocalStore } from "@domain/GlucoseStore";
 import type { GlucoseValue } from "@domain/GlucoseValue";
 import { type TimeRange, type Timestamp, timestamp } from "@domain/TimeRange";
-import { SQLocal } from "sqlocal";
+import { SQLocal, type Transaction } from "sqlocal";
 
 export class SQLite implements LocalStore {
 	private listeners = new Set<() => void>();
 
+	private CHUNK_SIZE = 500;
+
 	private constructor(
 		private db: SQLocal,
 		private readonly maxGap: Timestamp,
+		private readonly tx?: Transaction["sql"],
 	) {}
 
-	async addMeasurements(measurements: GlucoseValue[]): Promise<void> {
-		const params = measurements.map(() => "(?, ?)").join(", ");
-		const query = `INSERT INTO glucose_values (value, timestamp) VALUES ${params} ON CONFLICT (timestamp) DO NOTHING`;
-		const rows = measurements.flatMap(({ timestamp, glucose }) => [
-			glucose,
-			timestamp,
-		]);
-		await this.db.sql(query, ...rows);
+	private get sql() {
+		return this.tx ? this.tx : this.db.sql;
+	}
+
+	async addMeasurements(
+		measurements: GlucoseValue[],
+		cb: (store: LocalStore) => Promise<void>,
+	): Promise<void> {
+		this.db.transaction(async ({ sql }) => {
+			for (let i = 0; i < measurements.length; i += this.CHUNK_SIZE) {
+				const batch = measurements.slice(i, i + this.CHUNK_SIZE);
+
+				const placeholders = batch.map(() => "(?, ?)").join(",");
+				const params = batch.flatMap((m) => [m.glucose, m.timestamp]);
+
+				await sql(
+					`INSERT INTO glucose_values (value, timestamp) 
+             VALUES ${placeholders} 
+             ON CONFLICT (timestamp) DO NOTHING`,
+					...params,
+				);
+			}
+
+			cb(new SQLite(this.db, this.maxGap, sql));
+		});
+
 		this.notify();
 	}
 
 	async getKnownRanges(): Promise<TimeRange[]> {
-		const rows = await this.db
+		const rows = await this
 			.sql`SELECT start, end from known_ranges ORDER BY start ASC`;
 		return rows.map((r) => ({
 			from: timestamp(r.start),
@@ -34,10 +55,10 @@ export class SQLite implements LocalStore {
 	async addRanges(ranges: TimeRange[]): Promise<void> {
 		await this.ensureCorrectGap();
 
-		this.db.sql`DELETE FROM known_ranges`;
+		this.sql`DELETE FROM known_ranges`;
 		const query = ranges.map(() => "(?, ?)").join(", ");
 		const params = ranges.flatMap((range) => [range.from, range.to]);
-		await this.db.sql(
+		await this.sql(
 			"INSERT INTO known_ranges (start, end) VALUES ".concat(query),
 			...params,
 		);
@@ -46,20 +67,20 @@ export class SQLite implements LocalStore {
 	}
 
 	private async ensureCorrectGap() {
-		const row = await this.db
+		const row = await this
 			.sql`SELECT value FROM config WHERE key = ${"max_gap"}`;
 		const previousGap = row[0]?.value;
 		if (previousGap !== undefined && previousGap !== this.maxGap) {
-			await this.db.sql`DELETE FROM known_ranges`;
+			await this.sql`DELETE FROM known_ranges`;
 		}
 
-		await this.db
+		await this
 			.sql`INSERT INTO config (key, value) VALUES (${"max_gap"}, ${this.maxGap})
 		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`;
 	}
 
 	async loadMeasurements(range: TimeRange): Promise<GlucoseValue[]> {
-		const rows = await this.db
+		const rows = await this
 			.sql`SELECT * from glucose_values WHERE timestamp >= ${range.from} AND timestamp <= ${range.to} ORDER BY timestamp ASC`;
 
 		const results: GlucoseValue[] = [];
@@ -71,9 +92,8 @@ export class SQLite implements LocalStore {
 	}
 
 	async mean(range: TimeRange): Promise<number> {
-		const [row] = await this.db
+		const [row] = await this
 			.sql`SELECT AVG(value) AS mean FROM glucose_values WHERE timestamp >= ${range.from} AND timestamp <= ${range.to}`;
-		console.log({ row, range });
 		return row.mean;
 	}
 
@@ -99,6 +119,9 @@ export class SQLite implements LocalStore {
 							sql`CREATE INDEX IF NOT EXISTS idx_known_ranges_start_end ON known_ranges (start, end)`,
 
 							sql`CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value)`,
+
+							sql`PRAGMA journal_mode = WAL`,
+							sql`PRAGMA synchronous = NORMAL`,
 						];
 					},
 					reactive: true,

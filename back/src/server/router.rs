@@ -1,8 +1,10 @@
+use salvo::Response;
 use salvo::Router;
 use salvo::affix_state;
 use salvo::cors::AllowOrigin;
 use salvo::cors::Cors;
 
+use salvo::handler;
 use salvo::http::{Method, header::HeaderName};
 use salvo::serve_static::StaticDir;
 
@@ -46,6 +48,7 @@ pub fn router<T: StoreBound>(config: &ServerConfig, store: T) -> salvo::Router {
     Router::new()
         .hoop(affix_state::inject(store))
         .hoop(cors)
+        .hoop(set_coop_coep)
         .push(Router::with_path("glucose").get(list_glucose_values))
         .push(
             Router::with_path("{*path}").get(
@@ -54,4 +57,11 @@ pub fn router<T: StoreBound>(config: &ServerConfig, store: T) -> salvo::Router {
                     .auto_list(true),
             ),
         )
+}
+
+#[handler]
+async fn set_coop_coep(res: &mut Response) -> salvo::Result<()> {
+    res.add_header("Cross-Origin-Embedder-Policy", "require-corp", true)?;
+    res.add_header("Cross-Origin-Opener-Policy", "same-origin", true)?;
+    Ok(())
 }

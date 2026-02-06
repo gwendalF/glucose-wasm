@@ -16,6 +16,7 @@ import {
 } from "@infra/DataSource";
 import { AnalyserContext } from "@ui/analyserContext";
 import { GlucoseSyncerContext } from "@ui/syncerContext";
+import { SQLocal } from "sqlocal";
 import { SQLite } from "./infrastructure/GlucoseStore";
 import { App } from "./ui/App";
 
@@ -30,7 +31,9 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
 const boostrap = async () => {
 	let dbName = "gwendal.sqlite";
 	if (import.meta.env.DEV) {
-		dbName = ":memory:";
+		dbName = "testing.db";
+		const { deleteDatabaseFile } = new SQLocal(dbName);
+		await deleteDatabaseFile();
 	}
 
 	const apiUrl = import.meta.env.VITE_API_URL;
@@ -38,12 +41,19 @@ const boostrap = async () => {
 		dbName,
 		SYNC_POLICY.maxDelayBetweenSamples,
 	);
+
+	sqlLocal
+		.database()
+		.reactiveQuery((sql) => sql`SELECT count(*) AS n FROM known_ranges`)
+		.subscribe((d) => {
+			console.log("Known subs", d);
+		});
 	const httpClient = new DefaultClient();
 	const source = new HttpDataSource(apiUrl, httpClient);
 	const gapManager = new GapHandler(SYNC_POLICY.maxDelayBetweenSamples);
 	const anlyser = new Analyser(sqlLocal);
 
-	const slowClient = new ThrottledClient(100, httpClient);
+	const slowClient = new ThrottledClient(1_000, httpClient);
 	const slowSyncer = new GlucoseSyncer(
 		sqlLocal,
 		new HttpDataSource(apiUrl, slowClient),

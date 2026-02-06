@@ -1,7 +1,6 @@
 use std::io::Write;
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 
 use crate::glucose_values::{
     self,

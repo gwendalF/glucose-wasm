@@ -53,21 +53,24 @@ export class GlucoseSyncer {
 				to: range.to,
 			});
 
-			if (values.length > 0) {
-				await this.store.addMeasurements(values);
-			}
-
 			const { coveredRanges, nextCursor } = this.gapManager.computeCoveredRange(
 				values,
 				{ from: currentFrom, to: range.to },
 				hasMore,
 			);
 
-			const allRanges = await this.store.getKnownRanges();
-			const set = this.makeRangeSet(allRanges);
-			const rangesToInsert = set.consolidate(coveredRanges);
-			if (rangesToInsert.length > 0) {
-				await this.store.addRanges(rangesToInsert);
+			if (values.length > 0) {
+				console.log("Before tx");
+				const t = Date.now();
+				await this.store.addMeasurements(values, async (store) => {
+					const allRanges = await store.getKnownRanges();
+					const set = this.makeRangeSet(allRanges);
+					const rangesToInsert = set.consolidate(coveredRanges);
+					if (rangesToInsert.length > 0) {
+						await store.addRanges(rangesToInsert);
+					}
+				});
+				console.log("After full tx with range", Date.now() - t);
 			}
 
 			if (nextCursor && nextCursor < range.to) {

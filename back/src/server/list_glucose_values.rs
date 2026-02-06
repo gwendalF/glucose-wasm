@@ -27,7 +27,7 @@ pub async fn list_glucose_values(
     let from = DateTime::from_timestamp_millis(query.from).ok_or(Error::InvalidRequest)?;
     let to = DateTime::from_timestamp_millis(query.to).ok_or(Error::InvalidRequest)?;
     let now = time::Instant::now();
-    let measurements = store.load(from, to, 1000)?;
+    let measurements = store.load(from, to, 20_000)?;
     let elapsed = now.elapsed().as_micros();
 
     res.add_header("Server-Timing", format!("db;dur={elapsed} us"), true)
