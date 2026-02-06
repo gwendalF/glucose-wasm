@@ -25,7 +25,9 @@ describe("GlucoseSyncer", ({ beforeEach }) => {
 			async getKnownRanges() {
 				return [];
 			},
-			async addMeasurements() {},
+			async addMeasurements(_, cb: (s: LocalStore) => Promise<void>) {
+				await cb(store);
+			},
 			async addRanges() {},
 			async loadMeasurements() {
 				return [];

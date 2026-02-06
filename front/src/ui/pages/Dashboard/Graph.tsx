@@ -2,61 +2,122 @@ import type { GlucoseValue } from "@domain/GlucoseValue";
 import type { TimePreset } from "@domain/TimeRange";
 import { prepareData } from "@ui/pages/Dashboard/prepareData";
 import { useDimension } from "@ui/useDimension";
-import { LineChart } from "echarts/charts";
-import {
-	DatasetComponent,
-	GridComponent,
-	TitleComponent,
-	TooltipComponent,
-	TransformComponent,
-} from "echarts/components";
-import { type ECharts, init, use } from "echarts/core";
-import { LabelLayout, UniversalTransition } from "echarts/features";
-import { CanvasRenderer } from "echarts/renderers";
-import { createEffect, createSignal, onCleanup } from "solid-js";
 
-use([
-	LineChart,
-	TitleComponent,
-	TooltipComponent,
-	GridComponent,
-	DatasetComponent,
-	TransformComponent,
-	LabelLayout,
-	UniversalTransition,
-	CanvasRenderer,
-]);
+import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
+import uPlot from "uplot";
+import "uplot/dist/uPlot.min.css";
 
 interface Props {
 	timeWindow(): TimePreset;
 	glucose(): GlucoseValue[] | undefined;
 }
 
+const options = (tooltip: HTMLDivElement): uPlot.Options => {
+	return {
+		width: 100,
+		height: 100,
+
+		cursor: {
+			y: false,
+		},
+		scales: {
+			x: {
+				time: true,
+				auto: true,
+			},
+			y: {
+				range: (_, min, max) => [
+					Math.min(0.9 * min, 40),
+					Math.max(1.1 * max, 300),
+				],
+			},
+		},
+
+		axes: [{ stroke: "#666" }, { stroke: "#666" }],
+		series: [
+			{},
+			{
+				stroke: "#3b82f6",
+				width: 2,
+				points: { show: false },
+			},
+		],
+		hooks: {
+			init: [(u) => u.over.appendChild(tooltip)],
+			setCursor: [
+				(u) => {
+					const { idx } = u.cursor;
+					if (!idx && idx !== 0) {
+						tooltip.classList.add("hidden");
+						return;
+					}
+
+					const val = u.data[1][idx];
+					const time = u.data[0][idx];
+
+					if (typeof val === "number") {
+						const x = u.valToPos(time, "x");
+						const y = u.valToPos(val, "y");
+
+						tooltip.textContent = `${val} mg/dL`;
+						tooltip.classList.remove("hidden");
+
+						tooltip.style.left = `${x}px`;
+						tooltip.style.top = `${y - 35}px`;
+						tooltip.style.transform = "translateX(-50%)";
+					}
+				},
+			],
+		},
+	};
+};
+
 export function Graph(props: Props) {
 	const [ref, setRef] = createSignal<HTMLDivElement>();
 	const [size] = useDimension(ref);
 
-	let chart: ECharts | undefined;
+	let chart: uPlot | undefined;
+	let tooltip: HTMLDivElement;
+
+	onMount(() => {
+		const tooltipClasses =
+			"absolute bg-white/95 p-2 border border-blue-500 rounded shadow-md pointer-events-none hidden z-100 text-xs font-bold text-blue-900";
+
+		tooltip = document.createElement("div");
+		tooltip.className = tooltipClasses;
+	});
 
 	createEffect(() => {
-		if (size() && chart) {
-			chart.resize();
+		const refSize = size();
+		if (refSize && chart) {
+			console.log({ width: refSize.width, height: refSize.height });
+			chart.setSize({ width: refSize.width, height: refSize.height });
 		}
 	});
 
 	createEffect(() => {
-		if (!ref()) return;
+		const div = ref();
+		if (!div) return;
 
 		if (!chart) {
-			chart = init(ref());
+			const opts = options(tooltip);
+			chart = new uPlot(
+				{ ...opts, width: div.clientWidth, height: div.clientHeight },
+				undefined,
+				div,
+			);
 		}
 
-		chart.setOption(prepareData(props.glucose() ?? []));
+		chart.setData(prepareData(props.glucose() ?? []));
 	});
 
 	onCleanup(() => {
-		if (chart) chart.dispose();
+		if (chart) chart.destroy();
 	});
 
-	return <div ref={setRef} class="w-full h-full" />;
+	return (
+		<div class="w-full h-full relative overflow-hidden">
+			<div ref={setRef} class="absolute inset-0" />
+		</div>
+	);
 }

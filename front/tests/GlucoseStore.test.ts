@@ -76,10 +76,13 @@ describe("SQLite glucose repository", () => {
 	}) => {
 		const { repo } = await setupRepo();
 
-		await repo.addMeasurements([
-			{ glucose: 80, timestamp: timestamp(50) },
-			{ glucose: 90, timestamp: timestamp(50) },
-		]);
+		await repo.addMeasurements(
+			[
+				{ glucose: 80, timestamp: timestamp(50) },
+				{ glucose: 90, timestamp: timestamp(50) },
+			],
+			async () => {},
+		);
 
 		const measurements = await repo.loadMeasurements({
 			from: timestamp(45),
@@ -87,83 +90,4 @@ describe("SQLite glucose repository", () => {
 		});
 		expect(measurements).toEqual([{ glucose: 80, timestamp: timestamp(50) }]);
 	});
-
-	// describe("markRangeComplete", () => {
-	// 	test("insert a range when no ranges aleady completed", async ({
-	// 		expect,
-	// 	}) => {
-	// 		const { repo, db } = await setupRepo();
-
-	// 		await repo.markRangeComplete({
-	// 			from: timestamp(1234),
-	// 			to: timestamp(4567),
-	// 		});
-
-	// 		const rows = await db.sql`SELECT * FROM completed_ranges`;
-	// 		expect(rows).toMatchObject([{ start: 1234, end: 4567 }]);
-	// 	});
-
-	// 	test("merges overlapping ranges", async ({ expect }) => {
-	// 		const { repo, db } = await setupRepo();
-
-	// 		await db.sql`INSERT INTO completed_ranges (start, end) VALUES (${timestamp(15)},${timestamp(25)} ), (${timestamp(30)}, ${timestamp(35)})`;
-
-	// 		await repo.markRangeComplete({ from: timestamp(20), to: timestamp(30) });
-
-	// 		const rows = await db.sql`SELECT * FROM completed_ranges`;
-	// 		expect(rows).toMatchObject([
-	// 			{ start: timestamp(15), end: timestamp(35) },
-	// 		]);
-	// 	});
-
-	// 	test("handle non-overlapping ranges", async ({ expect }) => {
-	// 		const { repo, db } = await setupRepo();
-	// 		await db.sql`INSERT INTO completed_ranges (start, end) VALUES (${timestamp(10)}, ${timestamp(15)}), (${timestamp(20)}, ${timestamp(25)})`;
-
-	// 		await repo.markRangeComplete({ from: timestamp(30), to: timestamp(35) });
-
-	// 		const rows = await db.sql`SELECT * FROM completed_ranges`;
-	// 		expect(rows).toMatchObject([
-	// 			{ start: 10, end: 15 },
-	// 			{ start: 20, end: 25 },
-	// 			{ start: 30, end: 35 },
-	// 		]);
-	// 	});
-	// });
-
-	// test("when no range return the requested range", async ({ expect }) => {
-	// 	const { repo } = await setupRepo();
-
-	// 	const requested = { from: timestamp(10), to: timestamp(50) };
-	// 	const ranges = await repo.getMissingRanges(requested);
-	// 	expect(ranges).toMatchObject([requested]);
-	// });
-
-	// test("return only range not already completed", async ({ expect }) => {
-	// 	const { repo, db } = await setupRepo();
-
-	// 	await db.sql`INSERT INTO completed_ranges (start, end) VALUES (${timestamp(1234)}, ${timestamp(4567)})`;
-
-	// 	const ranges = await repo.getMissingRanges({
-	// 		from: timestamp(10),
-	// 		to: timestamp(3000),
-	// 	});
-	// 	expect(ranges).toMatchObject([
-	// 		{ from: timestamp(10), to: timestamp(1234) },
-	// 	]);
-	// });
-
-	// test("non intersecting range is irrelevant", async ({ expect }) => {
-	// 	const { repo, db } = await setupRepo();
-
-	// 	await db.sql`INSERT INTO completed_ranges (start, end) VALUES (${timestamp(1234)}, ${timestamp(4567)}), (${timestamp(5000)}, ${timestamp(6000)})`;
-
-	// 	const ranges = await repo.getMissingRanges({
-	// 		from: timestamp(10),
-	// 		to: timestamp(2000),
-	// 	});
-	// 	expect(ranges).toMatchObject([
-	// 		{ from: timestamp(10), to: timestamp(1234) },
-	// 	]);
-	// });
 });

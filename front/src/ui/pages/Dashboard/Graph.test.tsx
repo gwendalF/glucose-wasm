@@ -3,11 +3,11 @@ import { describe, test } from "vitest";
 import { prepareData } from "./prepareData";
 
 describe("graph", () => {
-	test("empty data return empty array", ({ expect }) => {
+	test("empty data", ({ expect }) => {
 		expect(prepareData([])).toMatchSnapshot();
 	});
 
-	test("prepare data for echarts", ({ expect }) => {
+	test("prepare data for uplot", ({ expect }) => {
 		expect(
 			prepareData([
 				{ timestamp: timestamp(1234), glucose: 80 },

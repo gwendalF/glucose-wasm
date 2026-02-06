@@ -51,11 +51,12 @@ pub fn router<T: StoreBound>(config: &ServerConfig, store: T) -> salvo::Router {
         .hoop(
             Compression::new()
                 .enable_gzip(CompressionLevel::Fastest)
-                .content_types(&[salvo::http::mime::APPLICATION_OCTET_STREAM]),
+                .content_types(&[salvo::http::mime::APPLICATION_OCTET_STREAM])
+                .min_length(2048),
         )
+        .hoop(set_coop_coep)
         .hoop(affix_state::inject(store))
         .hoop(cors)
-        .hoop(set_coop_coep)
         .push(Router::with_path("glucose").get(list_glucose_values))
         .push(
             Router::with_path("{*path}").get(
