@@ -23,6 +23,12 @@ impl From<Option<&Box<dyn Any + Send + Sync>>> for Error {
     }
 }
 
+impl From<salvo::Error> for Error {
+    fn from(_value: salvo::Error) -> Self {
+        Self::Internal
+    }
+}
+
 #[async_trait]
 impl Writer for Error {
     async fn write(mut self, _req: &mut Request, _depot: &mut Depot, res: &mut Response) {

@@ -1,0 +1,26 @@
+declare type u8 = number
+declare type u16 = number
+declare type u32 = number
+declare type u64 = bigint
+declare type u128 = bigint
+declare type usize = bigint
+declare type i8 = number
+declare type i16 = number
+declare type i32 = number
+declare type i64 = bigint
+declare type i128 = bigint
+declare type isize = bigint
+declare type NonZeroU8 = number
+declare type NonZeroU16 = number
+declare type NonZeroU32 = number
+declare type NonZeroU64 = bigint
+declare type NonZeroU128 = bigint
+declare type NonZeroUsize = bigint
+declare type NonZeroI8 = number
+declare type NonZeroI16 = number
+declare type NonZeroI32 = number
+declare type NonZeroI64 = bigint
+declare type NonZeroI128 = bigint
+declare type NonZeroIsize = bigint
+declare type f32 = number
+declare type f64 = number declare type ArrayLengthMutationKeys = "splice" | "push" | "pop" | "shift" | "unshift" declare type FixedLengthArray<T, L extends number, TObj = [T, ...Array<T>]> = Pick<TObj, Exclude<keyof TObj, ArrayLengthMutationKeys>> & { readonly length: L [ I : number ] : T [Symbol.iterator]: () => IterableIterator<T> } export type Measurements = { timestamps: i64[], values: u16[], has_more: boolean } export type Type = "Measurements" declare type ValueType<T extends Type> = T extends "Measurements" ? Measurements : void export interface Result<T extends Type> { value: ValueType<T>; bytes: Uint8Array; } export function deserialize<T extends Type>(type: T, bytes: Uint8Array): Result<T>

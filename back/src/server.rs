@@ -18,7 +18,7 @@ pub fn run(config: &commands::Config) -> Result<(), std::io::Error> {
             http_port: config.http_port,
             https_port: config.https_port,
             address: String::from("0.0.0.0"),
-            sqlite_path: String::from("db.sqlite"),
+            db_path: String::from("postcard_zstd"),
             is_prod: config.is_prod,
             domain: config.domain.clone(),
         })
@@ -32,13 +32,13 @@ struct ServerConfig {
     https_port: u16,
     http_port: u16,
     address: String,
-    sqlite_path: String,
+    db_path: String,
     is_prod: bool,
     domain: String,
 }
 
 async fn main(config: ServerConfig) -> std::io::Result<()> {
-    match std::fs::exists(&config.sqlite_path) {
+    match std::fs::exists(&config.db_path) {
         Err(e) => {
             return Err(e);
         }
@@ -51,7 +51,7 @@ async fn main(config: ServerConfig) -> std::io::Result<()> {
         Ok(true) => (),
     }
 
-    let store = Store::new(&config.sqlite_path).unwrap();
+    let store = Store::new(&config.db_path).unwrap();
     let mut router = router::router(&config, store);
 
     if config.is_prod {

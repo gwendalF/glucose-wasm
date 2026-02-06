@@ -1,9 +1,10 @@
 use chrono::{DateTime, Utc};
 
+use postcard_bindgen::PostcardBindings;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Serialize)]
+#[derive(Serialize, PostcardBindings)]
 pub struct Measurements<'a> {
     pub timestamps: &'a [i64],
     pub values: &'a [u16],
@@ -131,7 +132,8 @@ impl Store {
                 Ok(Store { _private: () })
             }
             Err(e) => {
-                println!("Erreur loading postcard {e}");
+                eprintln!("Erreur loading postcard {e}");
+
                 let data = load_sqlite_data(path)?;
                 let _ = DATA.set(data);
                 Ok(Store { _private: () })

@@ -6,6 +6,8 @@ use salvo::cors::Cors;
 
 use salvo::handler;
 use salvo::http::{Method, header::HeaderName};
+use salvo::prelude::Compression;
+use salvo::prelude::CompressionLevel;
 use salvo::serve_static::StaticDir;
 
 use super::ServerConfig;
@@ -46,6 +48,11 @@ pub fn router<T: StoreBound>(config: &ServerConfig, store: T) -> salvo::Router {
     let cors = cors.into_handler();
 
     Router::new()
+        .hoop(
+            Compression::new()
+                .enable_gzip(CompressionLevel::Fastest)
+                .content_types(&[salvo::http::mime::APPLICATION_OCTET_STREAM]),
+        )
         .hoop(affix_state::inject(store))
         .hoop(cors)
         .hoop(set_coop_coep)

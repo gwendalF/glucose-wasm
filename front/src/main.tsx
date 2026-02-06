@@ -10,8 +10,8 @@ import { RangeSet } from "@domain/RangeSet";
 import { SYNC_POLICY } from "@domain/syncPolicy";
 import { type TimeRange, timestamp } from "@domain/TimeRange";
 import {
-	DefaultClient,
 	HttpDataSource,
+	PostcardClient,
 	ThrottledClient,
 } from "@infra/DataSource";
 import { AnalyserContext } from "@ui/analyserContext";
@@ -41,14 +41,7 @@ const boostrap = async () => {
 		dbName,
 		SYNC_POLICY.maxDelayBetweenSamples,
 	);
-
-	sqlLocal
-		.database()
-		.reactiveQuery((sql) => sql`SELECT count(*) AS n FROM known_ranges`)
-		.subscribe((d) => {
-			console.log("Known subs", d);
-		});
-	const httpClient = new DefaultClient();
+	const httpClient = new PostcardClient();
 	const source = new HttpDataSource(apiUrl, httpClient);
 	const gapManager = new GapHandler(SYNC_POLICY.maxDelayBetweenSamples);
 	const anlyser = new Analyser(sqlLocal);

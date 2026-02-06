@@ -1,6 +1,7 @@
 import type { DataSource } from "@application/DataSource";
 import type { GlucoseValue } from "@domain/GlucoseValue";
 import { type TimeRange, timestamp } from "@domain/TimeRange";
+import { deserialize, type Measurements } from "postcard-bindings";
 
 type ServerResponse = {
 	values: number[];
@@ -9,7 +10,7 @@ type ServerResponse = {
 };
 
 interface HttpClient {
-	get<T>(url: string): Promise<T>;
+	get(url: string): Promise<Measurements>;
 }
 
 export class DefaultClient implements HttpClient {
@@ -17,6 +18,17 @@ export class DefaultClient implements HttpClient {
 		const response = await fetch(url);
 		const json = await response.json();
 		return json;
+	}
+}
+
+export class PostcardClient implements HttpClient {
+	async get(url: string) {
+		const response = await fetch(url);
+
+		const buffer = await response.arrayBuffer();
+		const bytes = new Uint8Array(buffer);
+		const data = deserialize("Measurements", bytes);
+		return data.value;
 	}
 }
 
@@ -28,7 +40,7 @@ export class ThrottledClient implements HttpClient {
 		private client: HttpClient,
 	) {}
 
-	async get<T>(url: string): Promise<T> {
+	async get(url: string) {
 		if (this.inFlight) {
 			await this.inFlight();
 		}
@@ -50,12 +62,12 @@ export class HttpDataSource implements DataSource {
 		url.searchParams.append("from", range.from.toString());
 		url.searchParams.append("to", range.to.toString());
 
-		const data = await this.fetcher.get<ServerResponse>(url.toString());
+		const data = await this.fetcher.get(url.toString());
 
 		return {
 			values: data.timestamps.map((t, i) => ({
 				glucose: data.values[i],
-				timestamp: timestamp(t),
+				timestamp: timestamp(Number(t)),
 			})),
 			hasMore: !!data.has_more,
 		};

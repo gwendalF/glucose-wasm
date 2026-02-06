@@ -37,11 +37,14 @@ pub fn save_db_to_postcard(db_path: &str) -> Result<(), postcard::Error> {
 
     let raw = postcard::to_stdvec(&postcard).unwrap();
 
+    std::fs::write("postcard_raw", &raw).unwrap();
+
     let file = std::fs::File::create("postcard_zstd").unwrap();
 
     let mut encoder = zstd::Encoder::new(file, 15).unwrap();
 
     encoder.write_all(&raw).unwrap();
-
+    encoder.finish().unwrap();
+    eprintln!("Successful write of postcard data");
     Ok(())
 }

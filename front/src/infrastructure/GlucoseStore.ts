@@ -80,15 +80,14 @@ export class SQLite implements LocalStore {
 	}
 
 	async loadMeasurements(range: TimeRange): Promise<GlucoseValue[]> {
-		const rows = await this
-			.sql`SELECT * from glucose_values WHERE timestamp >= ${range.from} AND timestamp <= ${range.to} ORDER BY timestamp ASC`;
+		const id = crypto.randomUUID();
+		console.log("Before load", id);
+		const t = Date.now();
+		const rows: GlucoseValue[] = await this
+			.sql`SELECT timestamp, value AS glucose from glucose_values WHERE timestamp >= ${range.from} AND timestamp <= ${range.to} ORDER BY timestamp ASC`;
 
-		const results: GlucoseValue[] = [];
-		for (const row of rows) {
-			results.push({ timestamp: row.timestamp, glucose: row.value });
-		}
-
-		return results;
+		console.log("After load", Date.now() - t, id);
+		return rows;
 	}
 
 	async mean(range: TimeRange): Promise<number> {
@@ -113,7 +112,6 @@ export class SQLite implements LocalStore {
 					onInit(sql) {
 						return [
 							sql`CREATE TABLE IF NOT EXISTS glucose_values (id INTEGER PRIMARY KEY, value INTEGER NOT NULL, timestamp INTEGER NOT NULL UNIQUE)`,
-							sql`CREATE INDEX IF NOT EXISTS idx_glucose_timestamp ON glucose_values (timestamp)`,
 
 							sql`CREATE TABLE IF NOT EXISTS known_ranges (id INTEGER PRIMARY KEY, start INTEGER NOT NULL, end INTEGER NOT NULL)`,
 							sql`CREATE INDEX IF NOT EXISTS idx_known_ranges_start_end ON known_ranges (start, end)`,
@@ -124,7 +122,7 @@ export class SQLite implements LocalStore {
 							sql`PRAGMA synchronous = NORMAL`,
 						];
 					},
-					reactive: true,
+					reactive: false,
 					onConnect: () => resolve(db),
 				});
 			}),
