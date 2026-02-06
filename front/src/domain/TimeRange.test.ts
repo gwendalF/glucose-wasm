@@ -5,6 +5,7 @@ describe("timeRangeFor", () => {
 	const now = fromDate(new Date("2026-01-02T12:00:00.000Z"));
 
 	test.for([
+		[TimePresets.Last3Hours, fromDate(new Date("2026-01-02T09:00:00.000Z"))],
 		[TimePresets.Last6Hours, fromDate(new Date("2026-01-02T06:00:00.000Z"))],
 		[TimePresets.Last12Hours, fromDate(new Date("2026-01-02T00:00:00.000Z"))],
 		[TimePresets.Last24Hours, fromDate(new Date("2026-01-01T12:00:00.000Z"))],

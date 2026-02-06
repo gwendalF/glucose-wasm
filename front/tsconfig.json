@@ -18,7 +18,8 @@
 		"types": [
 			"vite/client",
 			"@testing-library/jest-dom",
-			"unplugin-icons/types/solid"
+			"unplugin-icons/types/solid",
+			"vite-plugin-pwa/solid"
 		],
 		"baseUrl": "src",
 		"paths": {

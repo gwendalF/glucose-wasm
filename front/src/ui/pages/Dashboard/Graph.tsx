@@ -12,6 +12,13 @@ interface Props {
 	glucose(): GlucoseValue[] | undefined;
 }
 
+const formatFr = {
+	hhmm: (date: Date) =>
+		date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }),
+	ddmm: (date: Date) =>
+		date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }),
+};
+
 const options = (tooltip: HTMLDivElement): uPlot.Options => {
 	return {
 		width: 100,
@@ -33,7 +40,22 @@ const options = (tooltip: HTMLDivElement): uPlot.Options => {
 			},
 		},
 
-		axes: [{ stroke: "#666" }, { stroke: "#666" }],
+		axes: [
+			{
+				stroke: "#666",
+				values: (_, ticks) => {
+					return ticks.map((t) => {
+						const date = new Date(t * 1000);
+						if (date.getHours() === 0 && date.getMinutes() === 0) {
+							return formatFr.ddmm(date);
+						}
+
+						return formatFr.hhmm(date);
+					});
+				},
+			},
+			{ stroke: "#666" },
+		],
 		series: [
 			{},
 			{
@@ -59,11 +81,16 @@ const options = (tooltip: HTMLDivElement): uPlot.Options => {
 						const x = u.valToPos(time, "x");
 						const y = u.valToPos(val, "y");
 
-						tooltip.textContent = `${val} mg/dL`;
+						const timeStr = new Date(time * 1000).toLocaleTimeString("fr-FR", {
+							hour: "2-digit",
+							minute: "2-digit",
+						});
+
+						tooltip.innerHTML = `<div style="font-size: 0.8em; opacity: 0.8;">${timeStr}</div><div>${val} mg/dL</div>`;
 						tooltip.classList.remove("hidden");
 
 						tooltip.style.left = `${x}px`;
-						tooltip.style.top = `${y - 35}px`;
+						tooltip.style.top = `${y - 45}px`;
 						tooltip.style.transform = "translateX(-50%)";
 					}
 				},
@@ -90,7 +117,6 @@ export function Graph(props: Props) {
 	createEffect(() => {
 		const refSize = size();
 		if (refSize && chart) {
-			console.log({ width: refSize.width, height: refSize.height });
 			chart.setSize({ width: refSize.width, height: refSize.height });
 		}
 	});

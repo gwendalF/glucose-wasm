@@ -47,33 +47,45 @@ export class GlucoseSyncer {
 	private async fetchAndStore(range: TimeRange): Promise<void> {
 		let currentFrom = range.from;
 
+		let retryCount = 0;
 		while (true) {
-			const { values, hasMore } = await this.source.fetchMeasurements({
-				from: currentFrom,
-				to: range.to,
-			});
-
-			const { coveredRanges, nextCursor } = this.gapManager.computeCoveredRange(
-				values,
-				{ from: currentFrom, to: range.to },
-				hasMore,
-			);
-
-			if (values.length > 0) {
-				await this.store.addMeasurements(values, async (store) => {
-					const allRanges = await store.getKnownRanges();
-					const set = this.makeRangeSet(allRanges);
-					const rangesToInsert = set.consolidate(coveredRanges);
-					if (rangesToInsert.length > 0) {
-						await store.addRanges(rangesToInsert);
-					}
+			try {
+				const { values, hasMore } = await this.source.fetchMeasurements({
+					from: currentFrom,
+					to: range.to,
 				});
-			}
+				retryCount = 0;
 
-			if (nextCursor && nextCursor < range.to) {
-				currentFrom = nextCursor;
-			} else {
-				break;
+				const { coveredRanges, nextCursor } =
+					this.gapManager.computeCoveredRange(
+						values,
+						{ from: currentFrom, to: range.to },
+						hasMore,
+					);
+
+				if (values.length > 0) {
+					await this.store.addMeasurements(values, async (store) => {
+						const allRanges = await store.getKnownRanges();
+						const set = this.makeRangeSet(allRanges);
+						const rangesToInsert = set.consolidate(coveredRanges);
+						if (rangesToInsert.length > 0) {
+							await store.addRanges(rangesToInsert);
+						}
+					});
+				}
+
+				if (nextCursor && nextCursor < range.to) {
+					currentFrom = nextCursor;
+				} else {
+					break;
+				}
+			} catch (e) {
+				console.warn(e);
+				retryCount += 1;
+
+				const delay = 2 ** retryCount * 1000;
+
+				await new Promise((res) => setTimeout(res, delay));
 			}
 		}
 	}
