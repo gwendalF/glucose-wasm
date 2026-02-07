@@ -51,6 +51,7 @@ pub fn router<T: StoreBound>(config: &ServerConfig, store: T) -> salvo::Router {
         .hoop(
             Compression::new()
                 .enable_gzip(CompressionLevel::Fastest)
+                .enable_zstd(CompressionLevel::Default)
                 .content_types(&[salvo::http::mime::APPLICATION_OCTET_STREAM])
                 .min_length(2048),
         )

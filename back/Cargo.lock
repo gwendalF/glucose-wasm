@@ -872,6 +872,7 @@ dependencies = [
  "rusqlite",
  "salvo",
  "serde",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "zstd",

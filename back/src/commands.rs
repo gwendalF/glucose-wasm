@@ -5,6 +5,9 @@ mod load_db;
 mod postcard;
 
 pub use config::Config;
+pub use load_db::generate_sqlite_file;
+pub use postcard::save_postcard;
+
 use postcard_bindgen::{
     PackageInfo, generate_bindings,
     javascript::{GenerationSettings, build_package},
