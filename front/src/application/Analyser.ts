@@ -1,4 +1,4 @@
-import type { LocalStore } from "@domain/GlucoseStore";
+import type { LocalStore } from "@domain/GlucoseRepository";
 import type { TimeRange } from "@domain/TimeRange";
 
 export class Analyser {

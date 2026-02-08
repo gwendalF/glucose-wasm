@@ -5,7 +5,7 @@ export type TimeRange = {
 
 export type Timestamp = number & { __brand: "Timestamp" };
 
-export function timestamp(msNumber: number): Timestamp {
+export function timestamp(msNumber: number | bigint): Timestamp {
 	return msNumber as Timestamp;
 }
 

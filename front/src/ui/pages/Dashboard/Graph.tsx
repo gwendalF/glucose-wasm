@@ -1,4 +1,4 @@
-import type { GlucoseValue } from "@domain/GlucoseValue";
+import type { GlucoseDataset } from "@domain/GlucoseRepository";
 import type { TimePreset } from "@domain/TimeRange";
 import { prepareData } from "@ui/pages/Dashboard/prepareData";
 import { useDimension } from "@ui/useDimension";
@@ -9,7 +9,7 @@ import "uplot/dist/uPlot.min.css";
 
 interface Props {
 	timeWindow(): TimePreset;
-	glucose(): GlucoseValue[] | undefined;
+	data(): GlucoseDataset | undefined;
 }
 
 const formatFr = {
@@ -134,7 +134,15 @@ export function Graph(props: Props) {
 			);
 		}
 
-		chart.setData(prepareData(props.glucose() ?? []));
+		chart.setData(
+			prepareData(
+				props.data() ?? {
+					length: 0,
+					timestamps: new Float64Array(0),
+					values: new Uint16Array(0),
+				},
+			),
+		);
 	});
 
 	onCleanup(() => {

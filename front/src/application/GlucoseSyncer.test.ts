@@ -1,399 +1,167 @@
-import { GapHandler, type GapManager } from "@domain/GapManager";
-import type { LocalStore } from "@domain/GlucoseStore";
-import { RangeSet } from "@domain/RangeSet";
-import { type TimeRange, timestamp } from "@domain/TimeRange";
-import { describe, test, vi } from "vitest";
+import type { GlucoseRepository } from "@domain/GlucoseRepository";
+import { timestamp } from "@domain/TimeRange";
+import { beforeEach, describe, type Mocked, test, vi } from "vitest";
+import type { DataSource } from "./DataSource";
 import { GlucoseSyncer } from "./GlucoseSyncer";
 
-describe("GlucoseSyncer", ({ beforeEach }) => {
-	let gapManager: GapManager;
-	let rangeSetFactory: (knownRanges: TimeRange[]) => RangeSet;
-	const subscribe = () => {
-		return () => {};
-	};
-
-	let store: LocalStore;
+describe("GlucoseSyncer", () => {
+	let repo: Mocked<GlucoseRepository>;
+	let source: Mocked<DataSource>;
+	let syncer: GlucoseSyncer;
 
 	beforeEach(() => {
-		// Always same range
-		gapManager = new GapHandler(timestamp(Number.MAX_VALUE));
-		rangeSetFactory = (knowns: TimeRange[]) => {
-			return new RangeSet(knowns, timestamp(0));
+		repo = {
+			getMissingRanges: vi.fn(),
+			ingest: vi.fn(),
+			getData: vi.fn(),
+			getKnownRanges: vi.fn(),
 		};
 
-		store = {
-			async getKnownRanges() {
-				return [];
-			},
-			async addMeasurements(_, cb: (s: LocalStore) => Promise<void>) {
-				await cb(store);
-			},
-			async addRanges() {},
-			async loadMeasurements() {
-				return [];
-			},
-			subscribe,
-			async mean() {
-				return 0;
-			},
+		source = {
+			fetchMeasurements: vi.fn(),
 		};
+
+		syncer = new GlucoseSyncer(repo, source);
 	});
 
 	test("does not fetch if all data is already local", async ({ expect }) => {
 		const range = { from: timestamp(0), to: timestamp(100) };
 
-		store.getKnownRanges = async () => {
-			return [range];
-		};
+		repo.getMissingRanges.mockResolvedValue([]);
 
-		const source = {
-			fetchMeasurements: vi.fn(),
-		};
-
-		const service = new GlucoseSyncer(
-			store,
-			source,
-			gapManager,
-			rangeSetFactory,
-		);
-		await service.fetchMissing(range);
+		await syncer.fetchMissing(range);
 
 		expect(source.fetchMeasurements).not.toHaveBeenCalled();
 	});
 
-	test("fetch data from source if not present", async ({ expect }) => {
-		const range = { from: timestamp(0), to: timestamp(100) };
-
-		const source = {
-			fetchMeasurements: vi.fn(async () => {
-				return { values: [], hasMore: false };
-			}),
-		};
-
-		const service = new GlucoseSyncer(
-			store,
-			source,
-			gapManager,
-			rangeSetFactory,
-		);
-		await service.fetchMissing(range);
-
-		expect(source.fetchMeasurements).toHaveBeenCalled();
-	});
-
-	test("fetches only missing ranges", async ({ expect }) => {
-		const requested = { from: timestamp(0), to: timestamp(100) };
-		store.getKnownRanges = async () => {
-			return [
-				{ from: timestamp(0), to: timestamp(20) },
-				{ from: timestamp(50), to: timestamp(70) },
-			];
-		};
-
-		const source = {
-			fetchMeasurements: vi.fn(async () => {
-				return { values: [], hasMore: false };
-			}),
-		};
-		const service = new GlucoseSyncer(
-			store,
-			source,
-			gapManager,
-			(knowns) => new RangeSet(knowns, timestamp(0)),
-		);
-		await service.fetchMissing(requested);
-
-		expect(source.fetchMeasurements).toHaveBeenCalledTimes(2);
-		expect(source.fetchMeasurements).toHaveBeenCalledWith({
-			from: timestamp(20),
-			to: timestamp(50),
-		});
-		expect(source.fetchMeasurements).toHaveBeenCalledWith({
-			from: timestamp(70),
-			to: timestamp(100),
-		});
-	});
-
-	test("when server respond with hasMore, keep polling", async ({ expect }) => {
-		const requested = { from: timestamp(0), to: timestamp(100) };
-
-		const source = {
-			fetchMeasurements: vi
-				.fn()
-				.mockResolvedValueOnce({
-					values: [
-						{ timestamp: timestamp(50), glucose: 80 },
-						{ timestamp: timestamp(80), glucose: 90 },
-					],
-					hasMore: true,
-				})
-				.mockResolvedValueOnce({ values: [], hasMore: false }),
-		};
-		const service = new GlucoseSyncer(
-			store,
-			source,
-			gapManager,
-			rangeSetFactory,
-		);
-		await service.fetchMissing(requested);
-
-		expect(source.fetchMeasurements).toHaveBeenCalledTimes(2);
-		expect(source.fetchMeasurements).toHaveBeenCalledWith({
-			from: timestamp(0),
-			to: timestamp(100),
-		});
-		expect(source.fetchMeasurements).toHaveBeenCalledWith({
-			from: timestamp(81),
-			to: timestamp(100),
-		});
-	});
-
-	test("stop fetching when gapManager does not return cursor or cursor after requested range", async ({
-		expect,
-	}) => {
-		const to = timestamp(100);
-		const requested = { from: timestamp(0), to };
-
-		const source = {
-			fetchMeasurements: vi
-				.fn()
-				.mockResolvedValue({ values: [], hasMore: false }),
-		};
-
-		const gapManagerMock = {
-			computeCoveredRange: vi
-				.fn()
-				.mockReturnValueOnce({
-					coveredRanges: [{ from: timestamp(0), to: timestamp(9) }],
-					nextCursor: timestamp(10),
-				})
-				.mockReturnValue({
-					coveredRanges: [],
-				}),
-		};
-
-		const service = new GlucoseSyncer(
-			store,
-			source,
-			gapManagerMock,
-			rangeSetFactory,
-		);
-		await service.fetchMissing(requested);
-		expect(source.fetchMeasurements).toHaveBeenCalledTimes(2);
-
-		source.fetchMeasurements.mockClear();
-		gapManagerMock.computeCoveredRange = vi.fn().mockReturnValue({
-			coveredRanges: [{ from: timestamp(0), to: timestamp(10) }],
-			nextCursor: to,
-		});
-
-		const serviceSameCursor = new GlucoseSyncer(
-			store,
-			source,
-			gapManagerMock,
-			rangeSetFactory,
-		);
-		await serviceSameCursor.fetchMissing(requested);
-		expect(source.fetchMeasurements).toHaveBeenCalledOnce();
-	});
-
-	test("deduplicate requests for same range", async ({ expect }) => {
-		const requested = { from: timestamp(0), to: timestamp(100) };
-
-		const source = {
-			fetchMeasurements: vi.fn().mockResolvedValueOnce({
-				values: [],
-				hasMore: false,
-			}),
-		};
-		const service = new GlucoseSyncer(
-			store,
-			source,
-			gapManager,
-			rangeSetFactory,
-		);
-
-		const request1 = service.fetchMissing(requested);
-		const request2 = service.fetchMissing(requested);
-		await Promise.all([request1, request2]);
-
-		expect(source.fetchMeasurements).toHaveBeenCalledOnce();
-	});
-
-	test("allow to refetch same range after the first call is finished", async ({
+	test("fetches data from source if repo reports missing ranges", async ({
 		expect,
 	}) => {
 		const requested = { from: timestamp(0), to: timestamp(100) };
 
-		const source = {
-			fetchMeasurements: vi.fn().mockResolvedValue({
-				values: [],
-				hasMore: false,
-			}),
-		};
-		const service = new GlucoseSyncer(
-			store,
-			source,
-			gapManager,
-			rangeSetFactory,
-		);
+		repo.getMissingRanges.mockResolvedValue([requested]);
+		source.fetchMeasurements.mockResolvedValue({ values: [], hasMore: false });
+		repo.ingest.mockResolvedValue({});
 
-		await service.fetchMissing(requested);
-		await service.fetchMissing(requested);
-
-		expect(source.fetchMeasurements).toHaveBeenCalledTimes(2);
-	});
-
-	test("can fetch different ranges at the same time", async ({ expect }) => {
-		const source = {
-			fetchMeasurements: vi.fn().mockResolvedValue({
-				values: [],
-				hasMore: false,
-			}),
-		};
-		const service = new GlucoseSyncer(
-			store,
-			source,
-			gapManager,
-			rangeSetFactory,
-		);
-
-		const p1 = service.fetchMissing({ from: timestamp(0), to: timestamp(100) });
-		const p2 = service.fetchMissing({
-			from: timestamp(10),
-			to: timestamp(200),
-		});
-		await Promise.all([p1, p2]);
-
-		expect(source.fetchMeasurements).toHaveBeenCalledTimes(2);
-	});
-
-	test("call the gapManager with the range corresponding of the missing range", async ({
-		expect,
-	}) => {
-		const hasMore = false;
-		const source = {
-			fetchMeasurements: vi.fn().mockResolvedValue({
-				values: [],
-				hasMore,
-			}),
-		};
-
-		const gapSpy = vi.spyOn(gapManager, "computeCoveredRange");
-		const service = new GlucoseSyncer(
-			store,
-			source,
-			gapManager,
-			rangeSetFactory,
-		);
-
-		const timeRequest = { from: timestamp(0), to: timestamp(100) };
-		await service.fetchMissing(timeRequest);
-		expect(gapSpy).toHaveBeenCalledWith([], timeRequest, hasMore);
-	});
-
-	test("only call addRanges when there are actually some ranges not covered", async ({
-		expect,
-	}) => {
-		const source = {
-			async fetchMeasurements() {
-				return {
-					hasMore: false,
-					values: [
-						{ timestamp: timestamp(100), glucose: 80 },
-						{ timestamp: timestamp(200), glucose: 90 },
-					],
-				};
-			},
-		};
-
-		const addRangesMock = vi.fn();
-		store.addRanges = addRangesMock;
-
-		const service = new GlucoseSyncer(
-			store,
-			source,
-			gapManager,
-			(knownRanges: TimeRange[]) => {
-				return {
-					consolidate(toAdd: TimeRange[]) {
-						return [...knownRanges, ...toAdd];
-					},
-					resolveMissingRanges(requested: TimeRange) {
-						return [requested];
-					},
-				};
-			},
-		);
-
-		const timeRequest = { from: timestamp(0), to: timestamp(100) };
-		await service.fetchMissing(timeRequest);
-		expect(addRangesMock).toHaveBeenCalledOnce();
-		addRangesMock.mockClear();
-
-		const serviceWihtoutConsolidate = new GlucoseSyncer(
-			store,
-			source,
-			gapManager,
-			() => {
-				return {
-					consolidate() {
-						return [];
-					},
-					resolveMissingRanges(requested: TimeRange) {
-						return [requested];
-					},
-				};
-			},
-		);
-		await serviceWihtoutConsolidate.fetchMissing(timeRequest);
-		expect(addRangesMock).not.toHaveBeenCalled();
-	});
-
-	test("does not call addMeasurements if fetch returns empty", async ({
-		expect,
-	}) => {
-		const requested = { from: timestamp(0), to: timestamp(50) };
-		let addMeasurementsCalled = false;
-
-		const store = {
-			async getKnownRanges() {
-				return [];
-			},
-			async addMeasurements() {
-				addMeasurementsCalled = true;
-			},
-			async addRanges() {},
-			loadMeasurements: vi.fn(),
-			subscribe,
-			mean: vi.fn(),
-		};
-
-		let firstCall = true;
-		const source = {
-			async fetchMeasurements(_range: TimeRange) {
-				if (firstCall) {
-					firstCall = false;
-					return { values: [], hasMore: false }; // no data
-				}
-
-				return {
-					values: [{ timestamp: timestamp(25), glucose: 80 }],
-					hasMore: false,
-				}; // some data
-			},
-		};
-
-		const syncer = new GlucoseSyncer(
-			store,
-			source,
-			gapManager,
-			rangeSetFactory,
-		);
 		await syncer.fetchMissing(requested);
 
-		expect(addMeasurementsCalled).toBe(false);
-		await syncer.fetchMissing(requested); // with some data calls addMeasurements
-		expect(addMeasurementsCalled).toBe(true);
+		expect(source.fetchMeasurements).toHaveBeenCalledWith(requested);
+		expect(repo.ingest).toHaveBeenCalled();
+	});
+
+	test("fetches only missing ranges reported by repo", async ({ expect }) => {
+		const requested = { from: timestamp(0), to: timestamp(100) };
+		const missing1 = { from: timestamp(20), to: timestamp(50) };
+		const missing2 = { from: timestamp(70), to: timestamp(100) };
+
+		repo.getMissingRanges.mockResolvedValue([missing1, missing2]);
+		source.fetchMeasurements.mockResolvedValue({ values: [], hasMore: false });
+		repo.ingest.mockResolvedValue({});
+
+		await syncer.fetchMissing(requested);
+
+		expect(source.fetchMeasurements).toHaveBeenCalledTimes(2);
+		expect(source.fetchMeasurements).toHaveBeenCalledWith(missing1);
+		expect(source.fetchMeasurements).toHaveBeenCalledWith(missing2);
+	});
+
+	test("when ingest returns a nextCursor, continue polling same range", async ({
+		expect,
+	}) => {
+		const requested = { from: timestamp(0), to: timestamp(100) };
+		repo.getMissingRanges.mockResolvedValue([requested]);
+
+		// Premier appel : renvoie un curseur à 50
+		source.fetchMeasurements.mockResolvedValueOnce({
+			values: [{ timestamp: timestamp(10), glucose: 80 }],
+			hasMore: true,
+		});
+		repo.ingest.mockResolvedValueOnce({ nextCursor: timestamp(50) });
+
+		// Deuxième appel : termine
+		source.fetchMeasurements.mockResolvedValueOnce({
+			values: [],
+			hasMore: false,
+		});
+		repo.ingest.mockResolvedValueOnce({});
+
+		await syncer.fetchMissing(requested);
+
+		expect(source.fetchMeasurements).toHaveBeenCalledTimes(2);
+		expect(source.fetchMeasurements).toHaveBeenNthCalledWith(2, {
+			from: timestamp(50),
+			to: timestamp(100),
+		});
+	});
+
+	test("deduplicate concurrent requests for exactly the same range", async ({
+		expect,
+	}) => {
+		const requested = { from: timestamp(0), to: timestamp(100) };
+		repo.getMissingRanges.mockResolvedValue([requested]);
+
+		source.fetchMeasurements.mockImplementation(
+			() =>
+				new Promise((res) =>
+					setTimeout(() => res({ values: [], hasMore: false }), 10),
+				),
+		);
+		repo.ingest.mockResolvedValue({});
+
+		const p1 = syncer.fetchMissing(requested);
+		const p2 = syncer.fetchMissing(requested);
+		await Promise.all([p1, p2]);
+
+		expect(source.fetchMeasurements).toHaveBeenCalledOnce();
+	});
+
+	test("allows refetching the same range after the previous call is finished", async ({
+		expect,
+	}) => {
+		const requested = { from: timestamp(0), to: timestamp(100) };
+		repo.getMissingRanges.mockResolvedValue([requested]);
+		source.fetchMeasurements.mockResolvedValue({ values: [], hasMore: false });
+		repo.ingest.mockResolvedValue({});
+
+		await syncer.fetchMissing(requested);
+		await syncer.fetchMissing(requested);
+
+		expect(source.fetchMeasurements).toHaveBeenCalledTimes(2);
+	});
+
+	test("can fetch different ranges simultaneously", async ({ expect }) => {
+		const r1 = { from: timestamp(0), to: timestamp(50) };
+		const r2 = { from: timestamp(60), to: timestamp(100) };
+
+		repo.getMissingRanges.mockImplementation(async (r) => [r]);
+		source.fetchMeasurements.mockResolvedValue({ values: [], hasMore: false });
+		repo.ingest.mockResolvedValue({});
+
+		await Promise.all([syncer.fetchMissing(r1), syncer.fetchMissing(r2)]);
+
+		expect(source.fetchMeasurements).toHaveBeenCalledTimes(2);
+	});
+
+	test("exponential backoff on failure", async ({ expect }) => {
+		vi.useFakeTimers();
+		const requested = { from: timestamp(0), to: timestamp(100) };
+		repo.getMissingRanges.mockResolvedValue([requested]);
+
+		// Échoue une fois, puis réussit
+		source.fetchMeasurements
+			.mockRejectedValueOnce(new Error("Network Error"))
+			.mockResolvedValueOnce({ values: [], hasMore: false });
+
+		repo.ingest.mockResolvedValue({});
+
+		const promise = syncer.fetchMissing(requested);
+
+		// On attend le premier retry (2^1 * 1000 = 2000ms)
+		await vi.advanceTimersByTimeAsync(2001);
+
+		await promise;
+
+		expect(source.fetchMeasurements).toHaveBeenCalledTimes(2);
+		vi.useRealTimers();
 	});
 });

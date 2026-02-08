@@ -1,9 +1,9 @@
-import type { GlucoseValue } from "./GlucoseValue";
 import { type TimeRange, type Timestamp, timestamp } from "./TimeRange";
+import type { TypedArray } from "./TypedArray";
 
 export interface GapManager {
 	computeCoveredRange(
-		values: readonly GlucoseValue[],
+		timestamps: readonly Timestamp[] | TypedArray,
 		requestedRange: TimeRange,
 		hasMore: boolean,
 	): {
@@ -16,25 +16,25 @@ export class GapHandler implements GapManager {
 	constructor(private readonly maxGap: Timestamp) {}
 
 	computeCoveredRange(
-		values: readonly GlucoseValue[],
+		timestamps: readonly Timestamp[] | TypedArray,
 		requestedRange: TimeRange,
 		hasMore: boolean,
 	) {
-		if (values.length === 0) {
+		if (timestamps.length === 0) {
 			return { coveredRanges: [] };
 		}
 
-		const firstTimestamp = values[0].timestamp;
-		const lastTimestamp = values[values.length - 1].timestamp;
+		const firstTimestamp = timestamps[0];
+		const lastTimestamp = timestamp(timestamps[timestamps.length - 1]);
 
 		const from =
 			firstTimestamp - requestedRange.from <= this.maxGap
-				? requestedRange.from
-				: firstTimestamp;
+				? timestamp(requestedRange.from)
+				: timestamp(firstTimestamp);
 
 		let to = lastTimestamp;
 		if (!hasMore && requestedRange.to - lastTimestamp <= this.maxGap) {
-			to = requestedRange.to;
+			to = timestamp(requestedRange.to);
 		}
 
 		const nextCursor = hasMore ? timestamp(lastTimestamp + 1) : undefined;

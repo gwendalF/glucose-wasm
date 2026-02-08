@@ -3,12 +3,6 @@ import type { GlucoseValue } from "@domain/GlucoseValue";
 import { type TimeRange, timestamp } from "@domain/TimeRange";
 import { deserialize, type Measurements } from "postcard-bindings";
 
-type ServerResponse = {
-	values: number[];
-	timestamps: number[];
-	has_more: boolean;
-};
-
 interface HttpClient {
 	get(url: string): Promise<Measurements>;
 }

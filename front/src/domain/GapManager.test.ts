@@ -18,25 +18,22 @@ describe("GapHandler", () => {
 	test.for([
 		[
 			timestamp(5),
-			[{ timestamp: timestamp(1005), glucose: 100 }],
+			[timestamp(1005)],
 			[{ from: timestamp(1000), to: timestamp(1005) }],
 		],
 		[
 			timestamp(5),
-			[{ timestamp: timestamp(1000), glucose: 80 }],
+			[timestamp(1000)],
 			[{ from: timestamp(1000), to: timestamp(1000) }],
 		],
 		[
 			timestamp(5),
-			[{ timestamp: timestamp(1006), glucose: 90 }],
+			[timestamp(1006)],
 			[{ from: timestamp(1006), to: timestamp(1006) }],
 		],
 		[
 			timestamp(5),
-			[
-				{ timestamp: timestamp(1005), glucose: 80 },
-				{ timestamp: timestamp(1995), glucose: 85 },
-			],
+			[timestamp(1005), timestamp(1995)],
 			[{ from: timestamp(1000), to: timestamp(2000) }],
 		],
 	] as const)("should snap to requested start and end", ([
@@ -58,10 +55,7 @@ describe("GapHandler", () => {
 	}) => {
 		const manager = new GapHandler(timestamp(5));
 		const requested = { from: timestamp(1000), to: timestamp(2000) };
-		const values = [
-			{ timestamp: timestamp(1005), glucose: 100 },
-			{ timestamp: timestamp(1100), glucose: 105 },
-		];
+		const values = [timestamp(1005), timestamp(1100)];
 
 		const result = manager.computeCoveredRange(values, requested, true);
 
@@ -76,10 +70,7 @@ describe("GapHandler", () => {
 	}) => {
 		const manager = new GapHandler(timestamp(15));
 		const requested = { from: timestamp(1000), to: timestamp(2000) };
-		const values = [
-			{ timestamp: timestamp(1016), glucose: 100 },
-			{ timestamp: timestamp(1984), glucose: 90 },
-		];
+		const values = [timestamp(1016), timestamp(1984)];
 
 		const result = manager.computeCoveredRange(values, requested, false);
 

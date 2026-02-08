@@ -1,17 +1,14 @@
-import type { GapManager } from "@domain/GapManager";
-import type { LocalStore } from "@domain/GlucoseStore";
-import type { RangeSetComputer } from "@domain/RangeSet";
+import type { GlucoseRepository } from "@domain/GlucoseRepository";
 import type { TimeRange } from "@domain/TimeRange";
 import type { DataSource } from "./DataSource";
 
 export class GlucoseSyncer {
 	private inFlights = new Set<string>();
+	private listeners = new Set<() => void>();
 
 	constructor(
-		private store: LocalStore,
+		private repo: GlucoseRepository,
 		private source: DataSource,
-		private gapManager: GapManager,
-		private makeRangeSet: (knownRanges: TimeRange[]) => RangeSetComputer,
 	) {}
 
 	private key(range: TimeRange) {
@@ -25,9 +22,7 @@ export class GlucoseSyncer {
 		this.inFlights.add(key);
 
 		try {
-			const knowns = await this.store.getKnownRanges();
-			const set = this.makeRangeSet(knowns);
-			const missings = set.resolveMissingRanges(requested);
+			const missings = await this.repo.getMissingRanges(requested);
 			for (const missing of missings) {
 				await this.fetchAndStore(missing);
 			}
@@ -36,12 +31,19 @@ export class GlucoseSyncer {
 		}
 	}
 
+	private notify() {
+		this.listeners.forEach((l) => {
+			l();
+		});
+	}
+
 	onChange(cb: () => void) {
-		return this.store.subscribe(cb);
+		this.listeners.add(cb);
+		return () => this.listeners.delete(cb);
 	}
 
 	async getMeasurements(range: TimeRange) {
-		return this.store.loadMeasurements(range);
+		return this.repo.getData(range);
 	}
 
 	private async fetchAndStore(range: TimeRange): Promise<void> {
@@ -56,24 +58,15 @@ export class GlucoseSyncer {
 				});
 				retryCount = 0;
 
-				const { coveredRanges, nextCursor } =
-					this.gapManager.computeCoveredRange(
-						values,
-						{ from: currentFrom, to: range.to },
-						hasMore,
-					);
-
-				if (values.length > 0) {
-					await this.store.addMeasurements(values, async (store) => {
-						const allRanges = await store.getKnownRanges();
-						const set = this.makeRangeSet(allRanges);
-						const rangesToInsert = set.consolidate(coveredRanges);
-						if (rangesToInsert.length > 0) {
-							await store.addRanges(rangesToInsert);
-						}
-					});
-				}
-
+				const { nextCursor } = await this.repo.ingest(
+					values,
+					{
+						from: currentFrom,
+						to: range.to,
+					},
+					hasMore,
+				);
+				this.notify();
 				if (nextCursor && nextCursor < range.to) {
 					currentFrom = nextCursor;
 				} else {

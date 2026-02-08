@@ -99,7 +99,7 @@ export function Dashboard() {
 						</Button>
 					</div>
 
-					<Graph timeWindow={() => TimePresets.Last24Hours} glucose={data} />
+					<Graph timeWindow={() => TimePresets.Last24Hours} data={data} />
 				</div>
 			</main>
 		</div>

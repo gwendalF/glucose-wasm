@@ -1,212 +1,86 @@
-import type { LocalStore } from "@domain/GlucoseStore";
+import type { GlucoseDataset, LocalStore } from "@domain/GlucoseRepository";
 import type { GlucoseValue } from "@domain/GlucoseValue";
-import { type TimeRange, type Timestamp, timestamp } from "@domain/TimeRange";
-import { SQLocal, type Transaction } from "sqlocal";
+import type { TimeRange } from "@domain/TimeRange";
 
-export class SQLite implements LocalStore {
-	private listeners = new Set<() => void>();
+export class InMemoryStore implements LocalStore {
+	private timestamps = new Float64Array();
+	private values = new Uint16Array();
 
-	private CHUNK_SIZE = 500;
+	async addMeasurements(measurements: GlucoseValue[]): Promise<void> {
+		if (measurements.length === 0) return;
 
-	private constructor(
-		private db: SQLocal,
-		private readonly maxGap: Timestamp,
-		private readonly tx?: Transaction["sql"],
-	) {}
+		const oldLen = this.timestamps.length;
+		const newLen = measurements.length;
+		const tempT = new Float64Array(oldLen + newLen);
+		const tempV = new Uint16Array(oldLen + newLen);
 
-	private get sql() {
-		return this.tx ? this.tx : this.db.sql;
-	}
+		let i = 0,
+			j = 0,
+			k = 0;
 
-	async addMeasurements(
-		measurements: GlucoseValue[],
-		cb: (store: LocalStore) => Promise<void>,
-	): Promise<void> {
-		this.db.transaction(async ({ sql }) => {
-			for (let i = 0; i < measurements.length; i += this.CHUNK_SIZE) {
-				const batch = measurements.slice(i, i + this.CHUNK_SIZE);
+		while (i < oldLen && j < newLen) {
+			const tOld = this.timestamps[i];
+			const tNew = measurements[j].timestamp;
 
-				const placeholders = batch.map(() => "(?, ?)").join(",");
-				const params = batch.flatMap((m) => [m.glucose, m.timestamp]);
-
-				await sql(
-					`INSERT INTO glucose_values (value, timestamp) 
-             VALUES ${placeholders} 
-             ON CONFLICT (timestamp) DO NOTHING`,
-					...params,
-				);
+			if (tOld < tNew) {
+				tempT[k] = tOld;
+				tempV[k] = this.values[i];
+				i++;
+			} else if (tNew < tOld) {
+				tempT[k] = tNew;
+				tempV[k] = measurements[j].glucose;
+				j++;
+			} else {
+				tempT[k] = tNew;
+				tempV[k] = measurements[j].glucose;
+				i++;
+				j++;
 			}
-
-			cb(new SQLite(this.db, this.maxGap, sql));
-		});
-
-		this.notify();
-	}
-
-	async getKnownRanges(): Promise<TimeRange[]> {
-		const rows = await this
-			.sql`SELECT start, end from known_ranges ORDER BY start ASC`;
-		return rows.map((r) => ({
-			from: timestamp(r.start),
-			to: timestamp(r.end),
-		}));
-	}
-
-	async addRanges(ranges: TimeRange[]): Promise<void> {
-		await this.ensureCorrectGap();
-
-		this.sql`DELETE FROM known_ranges`;
-		const query = ranges.map(() => "(?, ?)").join(", ");
-		const params = ranges.flatMap((range) => [range.from, range.to]);
-		await this.sql(
-			"INSERT INTO known_ranges (start, end) VALUES ".concat(query),
-			...params,
-		);
-
-		this.notify();
-	}
-
-	private async ensureCorrectGap() {
-		const row = await this
-			.sql`SELECT value FROM config WHERE key = ${"max_gap"}`;
-		const previousGap = row[0]?.value;
-		if (previousGap !== undefined && previousGap !== this.maxGap) {
-			await this.sql`DELETE FROM known_ranges`;
+			k++;
 		}
 
-		await this
-			.sql`INSERT INTO config (key, value) VALUES (${"max_gap"}, ${this.maxGap})
-		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`;
+		if (i < oldLen) {
+			const remaining = oldLen - i;
+			tempT.set(this.timestamps.subarray(i), k);
+			tempV.set(this.values.subarray(i), k);
+			k += remaining;
+		}
+
+		if (j < newLen) {
+			for (; j < newLen; j++, k++) {
+				tempT[k] = measurements[j].timestamp;
+				tempV[k] = measurements[j].glucose;
+			}
+		}
+
+		this.timestamps = tempT.slice(0, k);
+		this.values = tempV.slice(0, k);
 	}
 
-	async loadMeasurements(range: TimeRange): Promise<GlucoseValue[]> {
-		const rows: GlucoseValue[] = await this
-			.sql`SELECT timestamp, value AS glucose from glucose_values WHERE timestamp >= ${range.from} AND timestamp <= ${range.to} ORDER BY timestamp ASC`;
+	async getData(range: TimeRange): Promise<GlucoseDataset> {
+		const start = this.findInsertionIndex(range.from);
+		const end = this.findInsertionIndex(range.to);
 
-		return rows;
+		return {
+			length: end - start,
+			timestamps: this.timestamps.subarray(start, end),
+			values: this.values.subarray(start, end),
+		};
 	}
 
-	async mean(range: TimeRange): Promise<number> {
-		const [row] = await this
-			.sql`SELECT AVG(value) AS mean FROM glucose_values WHERE timestamp >= ${range.from} AND timestamp <= ${range.to}`;
-		return row.mean;
-	}
+	private findInsertionIndex(timestamp: number): number {
+		let left = 0;
+		let right = this.timestamps.length;
 
-	subscribe(fn: () => void): () => void {
-		this.listeners.add(fn);
-		return () => this.listeners.delete(fn);
-	}
+		while (left < right) {
+			const mid = (left + right) >>> 1;
 
-	static async create(
-		filename: string,
-		maxGap: Timestamp = timestamp(15 * 60 * 100),
-	) {
-		const db = await Promise.race([
-			new Promise<SQLocal>((resolve) => {
-				const db = new SQLocal({
-					databasePath: filename,
-					onInit(sql) {
-						return [
-							sql`CREATE TABLE IF NOT EXISTS glucose_values (id INTEGER PRIMARY KEY, value INTEGER NOT NULL, timestamp INTEGER NOT NULL UNIQUE)`,
-
-							sql`CREATE TABLE IF NOT EXISTS known_ranges (id INTEGER PRIMARY KEY, start INTEGER NOT NULL, end INTEGER NOT NULL)`,
-							sql`CREATE INDEX IF NOT EXISTS idx_known_ranges_start_end ON known_ranges (start, end)`,
-
-							sql`CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value)`,
-
-							sql`PRAGMA journal_mode = WAL`,
-							sql`PRAGMA synchronous = NORMAL`,
-						];
-					},
-					reactive: false,
-					onConnect: () => resolve(db),
-				});
-			}),
-			new Promise<never>((_, reject) => {
-				setTimeout(
-					() => reject(new Error("Can't connect to database")),
-					10_000,
-				);
-			}),
-		]);
-
-		return new SQLite(db, maxGap);
-	}
-
-	private notify() {
-		this.listeners.forEach((l) => {
-			l();
-		});
-	}
-
-	database() {
-		return this.db;
+			if (this.timestamps[mid] < timestamp) {
+				left = mid + 1;
+			} else {
+				right = mid;
+			}
+		}
+		return left;
 	}
 }
-
-// export class InMemoryStore implements LocalStore {
-//   private withRandom: boolean;
-//   private data: GlucoseValue[];
-
-//   constructor({
-//     withRandom = false,
-//     data,
-//   }: {
-//     withRandom?: boolean;
-//     data?: GlucoseValue[];
-//   }) {
-//     this.withRandom = !!withRandom;
-//     this.data = data ? data : [];
-//   }
-//   async addMeasurements(measurements: GlucoseValue[]): Promise<void> {
-//     this.data.push(...measurements);
-//   }
-
-//   async getKnownRanges(): Promise<TimeRange[]> {
-//     return [];
-//   }
-
-//   async addRanges(ranges: TimeRange[]): Promise<void> {
-//     throw new Error("Method not implemented.");
-//   }
-
-//   private fillRandomValues(range: TimeRange) {
-//     const numPts = 150;
-//     const step = Math.round((range.to - range.from) / numPts);
-//     const data = Array.from({ length: numPts }, (_, i) => ({
-//       glucose: Math.floor(Math.random() * (180 - 70) + 70),
-//       timestamp: timestamp(range.from + i * step),
-//     }));
-//     if (this.data.length === 0) {
-//       this.data = data;
-//       return;
-//     }
-
-//     const isAfter = range.from >= this.data[this.data.length - 1].timestamp;
-//     const isBefore = range.to <= this.data[0].timestamp;
-//     if (isAfter) {
-//       this.data.push(...data);
-//     }
-
-//     if (isBefore) {
-//       data.push(...this.data);
-//       this.data = data;
-//     }
-//   }
-
-//   async load(range: TimeRange): Promise<GlucoseValue[]> {
-//     if (this.withRandom && this.data.length) {
-//       const first = this.data[0].timestamp;
-//       const last = this.data[this.data.length - 1].timestamp;
-//       if (range.to <= first || range.from >= last) {
-//         this.fillRandomValues(range);
-//       }
-//     } else if (this.withRandom) {
-//       this.fillRandomValues(range);
-//     }
-
-//     return this.data.filter(
-//       (v) => v.timestamp >= range.from && v.timestamp <= range.to,
-//     );
-//   }
-// }
