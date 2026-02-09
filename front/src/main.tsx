@@ -14,7 +14,11 @@ import {
 	PostcardClient,
 	ThrottledClient,
 } from "@infra/DataSource";
+import { GlucoseRepository } from "@infra/GlucoseRepository";
 import { InMemoryStore } from "@infra/GlucoseStore";
+import { BrowserNetworkMonitor } from "@infra/NetworkMonitor";
+import { PersistentStore } from "@infra/PersistantStore";
+import { RangeStore } from "@infra/RangeStore";
 import { AnalyserContext } from "@ui/analyserContext";
 import { GlucoseSyncerContext } from "@ui/syncerContext";
 import { App } from "./ui/App";
@@ -30,7 +34,10 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
 const boostrap = async () => {
 	const apiUrl = import.meta.env.VITE_API_URL;
 
-	const store = new InMemoryStore();
+	const store = await PersistentStore.create(
+		new InMemoryStore(),
+		SYNC_POLICY.throttleSaveWorkerMs,
+	);
 
 	const httpClient = new PostcardClient();
 	const source = new HttpDataSource(apiUrl, httpClient);
@@ -41,23 +48,42 @@ const boostrap = async () => {
 		SYNC_POLICY.slowFetchDelayms,
 		httpClient,
 	);
-	const slowSyncer = new GlucoseSyncer(
+
+	const rangeRepo = RangeStore.fromDataset(
+		store.dataset(),
+		SYNC_POLICY.maxDelayInitialSamples,
+	);
+
+	const repository = new GlucoseRepository(
 		store,
-		new HttpDataSource(apiUrl, slowClient),
+		rangeRepo,
 		gapManager,
 		(knownsRanges: TimeRange[]) => {
 			return new RangeSet(knownsRanges, SYNC_POLICY.maxDelayBetweenSamples);
 		},
 	);
 
+	const networkMonitor = new BrowserNetworkMonitor();
+
+	const slowSyncer = new GlucoseSyncer(
+		repository,
+		new HttpDataSource(apiUrl, slowClient),
+		SYNC_POLICY.coalesceDelays,
+		networkMonitor,
+		(err: unknown) => {
+			console.log(err);
+		},
+	);
+
 	slowSyncer.fetchMissing({ from: timestamp(0), to: timestamp(Date.now()) });
 
 	const glucoseSyncer = new GlucoseSyncer(
-		store,
+		repository,
 		source,
-		gapManager,
-		(knownsRanges: TimeRange[]) => {
-			return new RangeSet(knownsRanges, SYNC_POLICY.maxDelayBetweenSamples);
+		SYNC_POLICY.coalesceDelays,
+		networkMonitor,
+		(err: unknown) => {
+			console.log(err);
 		},
 	);
 

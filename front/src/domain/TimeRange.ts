@@ -29,7 +29,8 @@ export const TimePresets = {
 	LastYear: "Lastyear",
 } as const;
 
-export const HOURS = 1000 * 60 * 60;
+export const MINUTES = 60 * 1000;
+export const HOURS = 60 * MINUTES;
 
 export type TimePreset = (typeof TimePresets)[keyof typeof TimePresets];
 

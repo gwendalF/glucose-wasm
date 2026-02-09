@@ -4,6 +4,7 @@ import type { TimeRange, Timestamp } from "./TimeRange";
 export interface LocalStore {
 	addMeasurements(measurements: GlucoseValue[]): Promise<void>;
 	getData(range: TimeRange): Promise<GlucoseDataset>;
+	getMean(range: TimeRange): Promise<number>;
 }
 
 export interface GlucoseDataset {
@@ -12,7 +13,7 @@ export interface GlucoseDataset {
 	readonly values: Uint16Array;
 }
 
-export interface GlucoseRepository {
+export interface Repository {
 	ingest(
 		values: GlucoseValue[],
 		fetchedRange: TimeRange,

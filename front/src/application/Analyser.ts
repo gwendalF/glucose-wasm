@@ -5,7 +5,7 @@ export class Analyser {
 	constructor(private store: LocalStore) {}
 
 	async mean(range: TimeRange) {
-		const meanValue = await this.store.mean(range);
+		const meanValue = await this.store.getMean(range);
 		return meanValue;
 	}
 }

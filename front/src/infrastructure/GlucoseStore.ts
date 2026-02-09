@@ -3,8 +3,8 @@ import type { GlucoseValue } from "@domain/GlucoseValue";
 import type { TimeRange } from "@domain/TimeRange";
 
 export class InMemoryStore implements LocalStore {
-	private timestamps = new Float64Array();
-	private values = new Uint16Array();
+	private timestamps: Float64Array<ArrayBufferLike> = new Float64Array();
+	private values: Uint16Array<ArrayBufferLike> = new Uint16Array();
 
 	async addMeasurements(measurements: GlucoseValue[]): Promise<void> {
 		if (measurements.length === 0) return;
@@ -58,8 +58,8 @@ export class InMemoryStore implements LocalStore {
 	}
 
 	async getData(range: TimeRange): Promise<GlucoseDataset> {
-		const start = this.findInsertionIndex(range.from);
-		const end = this.findInsertionIndex(range.to);
+		const start = this.findIndex(range.from);
+		const end = this.findIndex(range.to);
 
 		return {
 			length: end - start,
@@ -68,7 +68,7 @@ export class InMemoryStore implements LocalStore {
 		};
 	}
 
-	private findInsertionIndex(timestamp: number): number {
+	private findIndex(timestamp: number): number {
 		let left = 0;
 		let right = this.timestamps.length;
 
@@ -82,5 +82,35 @@ export class InMemoryStore implements LocalStore {
 			}
 		}
 		return left;
+	}
+
+	getAll(): GlucoseDataset {
+		return {
+			length: this.timestamps.length,
+			timestamps: this.timestamps,
+			values: this.values,
+		};
+	}
+
+	hydrate(data: GlucoseDataset): void {
+		this.timestamps = data.timestamps;
+		this.values = data.values;
+	}
+
+	async getMean(range: TimeRange): Promise<number> {
+		const fromIdx = this.findIndex(range.from);
+		const toIdx = this.findIndex(range.to);
+
+		const subarray = this.values.subarray(fromIdx, toIdx);
+		if (subarray.length === 0) {
+			return 0;
+		}
+
+		let sum = 0;
+		for (let i = 0; i < subarray.length; i++) {
+			sum += subarray[i];
+		}
+
+		return sum / subarray.length;
 	}
 }

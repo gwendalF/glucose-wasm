@@ -1,5 +1,7 @@
-import type { GlucoseRepository } from "@domain/GlucoseRepository";
-import type { TimeRange } from "@domain/TimeRange";
+import type { Repository } from "@domain/GlucoseRepository";
+import type { NetworkMonitor } from "@domain/network";
+import { coalesceGaps } from "@domain/RangeSet";
+import type { TimeRange, Timestamp } from "@domain/TimeRange";
 import type { DataSource } from "./DataSource";
 
 export class GlucoseSyncer {
@@ -7,8 +9,11 @@ export class GlucoseSyncer {
 	private listeners = new Set<() => void>();
 
 	constructor(
-		private repo: GlucoseRepository,
+		private repo: Repository,
 		private source: DataSource,
+		private coalesceDelayMs: Timestamp,
+		private networkMonitor: NetworkMonitor,
+		private errorReporting: (err: unknown) => void,
 	) {}
 
 	private key(range: TimeRange) {
@@ -23,7 +28,8 @@ export class GlucoseSyncer {
 
 		try {
 			const missings = await this.repo.getMissingRanges(requested);
-			for (const missing of missings) {
+			const merged = coalesceGaps(missings, this.coalesceDelayMs);
+			for (const missing of merged) {
 				await this.fetchAndStore(missing);
 			}
 		} finally {
@@ -52,6 +58,7 @@ export class GlucoseSyncer {
 		let retryCount = 0;
 		while (true) {
 			try {
+				await this.networkMonitor.waitForOnline();
 				const { values, hasMore } = await this.source.fetchMeasurements({
 					from: currentFrom,
 					to: range.to,
@@ -73,7 +80,7 @@ export class GlucoseSyncer {
 					break;
 				}
 			} catch (e) {
-				console.warn(e);
+				this.errorReporting(e);
 				retryCount += 1;
 
 				const delay = 2 ** retryCount * 1000;

@@ -1,11 +1,11 @@
-import type { GlucoseRepository } from "@domain/GlucoseRepository";
+import type { Repository } from "@domain/GlucoseRepository";
 import { timestamp } from "@domain/TimeRange";
 import { beforeEach, describe, type Mocked, test, vi } from "vitest";
 import type { DataSource } from "./DataSource";
 import { GlucoseSyncer } from "./GlucoseSyncer";
 
 describe("GlucoseSyncer", () => {
-	let repo: Mocked<GlucoseRepository>;
+	let repo: Mocked<Repository>;
 	let source: Mocked<DataSource>;
 	let syncer: GlucoseSyncer;
 
@@ -21,7 +21,17 @@ describe("GlucoseSyncer", () => {
 			fetchMeasurements: vi.fn(),
 		};
 
-		syncer = new GlucoseSyncer(repo, source);
+		syncer = new GlucoseSyncer(
+			repo,
+			source,
+			timestamp(0),
+			{
+				waitForOnline() {
+					return new Promise((r) => r());
+				},
+			},
+			() => {},
+		);
 	});
 
 	test("does not fetch if all data is already local", async ({ expect }) => {
@@ -147,7 +157,6 @@ describe("GlucoseSyncer", () => {
 		const requested = { from: timestamp(0), to: timestamp(100) };
 		repo.getMissingRanges.mockResolvedValue([requested]);
 
-		// Échoue une fois, puis réussit
 		source.fetchMeasurements
 			.mockRejectedValueOnce(new Error("Network Error"))
 			.mockResolvedValueOnce({ values: [], hasMore: false });
@@ -156,7 +165,6 @@ describe("GlucoseSyncer", () => {
 
 		const promise = syncer.fetchMissing(requested);
 
-		// On attend le premier retry (2^1 * 1000 = 2000ms)
 		await vi.advanceTimersByTimeAsync(2001);
 
 		await promise;

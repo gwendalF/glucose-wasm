@@ -74,3 +74,26 @@ export class RangeSet implements RangeSetComputer {
 		return this.knownRanges;
 	}
 }
+
+export function coalesceGaps(
+	gaps: TimeRange[],
+	threshold: Timestamp,
+): TimeRange[] {
+	const merged: TimeRange[] = [];
+	if (gaps.length === 0) return merged;
+
+	let current = { ...gaps[0] };
+
+	for (let i = 1; i < gaps.length; i++) {
+		const next = gaps[i];
+		if (next.from <= current.to + threshold) {
+			current.to = maxTimestamp(current.to, next.to);
+		} else {
+			merged.push(current);
+			current = { ...next };
+		}
+	}
+
+	merged.push(current);
+	return merged;
+}
