@@ -3,21 +3,26 @@ import type { GlucoseValue } from "@domain/GlucoseValue";
 import type { TimeRange } from "@domain/TimeRange";
 import type { InMemoryStore } from "./GlucoseStore";
 
-export type MainToWorkerMessage =
+export type Message =
 	| { type: "SAVE"; payload: GlucoseDataset }
 	| { type: "LOAD_ALL"; payload: undefined };
 
-export type WorkerToMainMessage =
-	| { type: "READY" }
+export type WorkerToMain =
+	| { type: "READY"; payload: undefined }
 	| { type: "LOADED"; payload: GlucoseDataset }
 	| { type: "ERROR"; payload: string };
 
+interface PostMessage {
+	postMessage(message: Message): void;
+}
+
 export class PersistentStore implements LocalStore {
 	private saveTimeout: ReturnType<typeof setTimeout> | null = null;
+	private static NAME = "worker-name";
 
 	private constructor(
 		private inMemory: InMemoryStore,
-		private worker: Worker,
+		private channel: PostMessage,
 		private throttleDelaysMs: number,
 	) {}
 
@@ -25,28 +30,50 @@ export class PersistentStore implements LocalStore {
 		inMemory: InMemoryStore,
 		throttleDelaysMs: number = 100,
 	): Promise<PersistentStore> {
-		const worker = new Worker(new URL("./worker.ts", import.meta.url), {
-			type: "module",
-		});
+		const channel = new BroadcastChannel(PersistentStore.NAME);
+		const store = new PersistentStore(inMemory, channel, throttleDelaysMs);
 
-		await new Promise<void>((resolve, reject) => {
-			worker.onmessage = (e: MessageEvent<WorkerToMainMessage>) => {
-				const msg = e.data;
+		store.startLeaderElection(channel);
+		channel.postMessage({ type: "LOAD_ALL" });
+		return store;
+	}
 
-				if (msg.type === "READY") {
-					worker.postMessage({ type: "LOAD_ALL", payload: undefined });
-				} else if (msg.type === "LOADED") {
-					inMemory.hydrate(msg.payload);
-					resolve();
-				} else if (msg.type === "ERROR") {
-					reject(new Error(msg.payload));
+	private handleMessage(e: MessageEvent<WorkerToMain>) {
+		const { type, payload } = e.data;
+		switch (type) {
+			case "LOADED":
+				this.inMemory.hydrate(payload);
+				break;
+			case "ERROR":
+				console.log("Error", payload);
+				break;
+		}
+	}
+
+	private startLeaderElection(channel: BroadcastChannel) {
+		navigator.locks.request(PersistentStore.NAME, async () => {
+			const worker = new Worker(new URL("./worker.ts", import.meta.url));
+
+			let ready = false;
+			channel.onmessage = (e) => {
+				if (ready) {
+					worker.postMessage(e.data);
 				}
 			};
 
-			worker.onerror = (err) => reject(err);
-		});
+			worker.onmessage = (e: MessageEvent<WorkerToMain>) => {
+				switch (e.data.type) {
+					case "READY":
+						ready = true;
+						worker.postMessage({ type: "LOAD_ALL" });
+						break;
+					default:
+						this.handleMessage(e);
+				}
+			};
 
-		return new PersistentStore(inMemory, worker, throttleDelaysMs);
+			await new Promise(() => {});
+		});
 	}
 
 	async addMeasurements(measurements: GlucoseValue[]): Promise<void> {
@@ -69,7 +96,7 @@ export class PersistentStore implements LocalStore {
 		this.saveTimeout = setTimeout(() => {
 			const dataBase = this.inMemory.getAll();
 
-			this.worker.postMessage({
+			this.channel.postMessage({
 				type: "SAVE",
 				payload: dataBase,
 			});

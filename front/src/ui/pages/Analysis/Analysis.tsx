@@ -73,6 +73,7 @@ export function Analysis() {
 							onValueChange={(updated) => {
 								setRange(updated.value);
 							}}
+							readOnlyInput
 						/>
 					</div>
 

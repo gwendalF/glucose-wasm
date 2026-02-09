@@ -33,19 +33,25 @@ type CombinedDatePickerProps = DatePickerRootProps & CustomProps;
 
 function DatePickerDemo(props: CombinedDatePickerProps) {
 	return (
-		<DatePicker startOfWeek={1} {...props}>
+		<DatePicker
+			startOfWeek={1}
+			{...props}
+			format={(date) => {
+				return `${date.day}/${date.month}/${date.year}`;
+			}}
+		>
 			<DatePickerControl>
 				<DatePickerInput
 					placeholder={props.placeholder}
 					fixOnBlur={false}
-					readOnly={!!props.readOnly}
+					readOnly={props.readOnlyInput}
 					index={0}
 				/>
 				{props.selectionMode === "range" && (
 					<DatePickerInput
 						placeholder={props.placeholder}
 						fixOnBlur={false}
-						readOnly={!!props.readOnlyInput}
+						readOnly={props.readOnlyInput}
 						index={1}
 					/>
 				)}

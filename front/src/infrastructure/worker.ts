@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import type { MainToWorkerMessage } from "./PersistantStore";
+import type { Message } from "./PersistantStore";
 
 let tsHandle: FileSystemSyncAccessHandle | null = null;
 let valHandle: FileSystemSyncAccessHandle | null = null;
@@ -26,7 +26,7 @@ async function initialize() {
 
 initialize();
 
-self.onmessage = (e: MessageEvent<MainToWorkerMessage>) => {
+self.onmessage = (e: MessageEvent<Message>) => {
 	const { type, payload } = e.data;
 
 	if (!tsHandle || !valHandle) {

@@ -26,7 +26,7 @@ import { Graph } from "./Graph";
 export function Dashboard() {
 	const syncer = useSyncer();
 	const [end, setEnd] = createSignal(new Date("2026-01-1"));
-	const [preset, setPreset] = createSignal<TimePreset>(TimePresets.Last6Hours);
+	const [preset, setPreset] = createSignal<TimePreset>(TimePresets.Last24Hours);
 	const range = () => timeRangeFor(preset(), fromDate(end()));
 	const [data, { mutate }] = createResource(range, (r) =>
 		syncer.getMeasurements(r),
